@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎭 El Impostor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            900: '#0a0a0f',
+                            800: '#12121a',
+                            700: '#1a1a25',
+                            600: '#252532',
+                            500: '#32324a',
+                        },
+                        citizen: '#3b82f6',
+                        impostor: '#ef4444',
+                        ready: '#22c55e',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 2s infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                        'scale-in': 'scaleIn 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.9)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%);
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .card-reveal {
+            perspective: 1000px;
+        }
+        
+        .card-reveal-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        
+        .card-reveal.revealed .card-reveal-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .card-front, .card-back {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        
+        .timer-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .timer-ring circle {
+            transition: stroke-dashoffset 1s linear;
+        }
+        
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .glow-citizen {
+            box-shadow: 0 0 60px rgba(59, 130, 246, 0.3);
+        }
+        
+        .glow-impostor {
+            box-shadow: 0 0 60px rgba(239, 68, 68, 0.3);
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #6366f1;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .category-chip {
+            transition: all 0.2s ease;
+        }
+        
+        .category-chip.selected {
+            background: rgba(99, 102, 241, 0.3);
+            border-color: #6366f1;
+        }
+        
+        .player-item {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        .screen {
+            display: none;
+        }
+        
+        .screen.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="font-sans text-white overflow-x-hidden">
+    
+    <!-- ==================== PANTALLA DE INICIO ==================== -->
+    <div id="screen-home" class="screen active flex-col items-center justify-center min-h-screen p-6">
+        <div class="text-center animate-fade-in">
+            <div class="text-7xl mb-4">🎭</div>
+            <h1 class="text-4xl font-black mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                EL IMPOSTOR
+            </h1>
+            <p class="text-gray-400 mb-10">Juego de deducción social</p>
+        </div>
+        
+        <div class="w-full max-w-sm space-y-4 animate-slide-up">
+            <button onclick="showScreen('create')" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold flex items-center justify-center gap-3">
+                <span class="text-2xl">👑</span>
+                Crear Partida
+            </button>
+            
+            <button onclick="showScreen('join')" class="btn-secondary w-full py-5 rounded-2xl text-lg font-semibold flex items-center justify-center gap-3">
+                <span class="text-2xl">🚪</span>
+                Unirse a Partida
+            </button>
+        </div>
+        
+        <p class="text-gray-500 text-sm mt-10 text-center">
+            Descubre quién es el impostor<br>antes de que sea tarde...
+        </p>
+    </div>
+    
+    <!-- ==================== PANTALLA CREAR PARTIDA ==================== -->
+    <div id="screen-create" class="screen flex-col items-center justify-center min-h-screen p-6">
+        <button onclick="showScreen('home')" class="absolute top-6 left-6 text-gray-400 hover:text-white transition">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </button>
+        
+        <div class="text-center mb-8 animate-fade-in">
+            <div class="text-5xl mb-4">👑</div>
+            <h2 class="text-2xl font-bold">Crear Partida</h2>
+            <p class="text-gray-400 mt-2">Serás el anfitrión</p>
+        </div>
+        
+        <div class="w-full max-w-sm animate-slide-up">
+            <div class="glass rounded-2xl p-6 mb-6">
+                <label class="block text-sm text-gray-400 mb-2">Tu nombre</label>
+                <input 
+                    type="text" 
+                    id="create-name" 
+                    placeholder="Ej: Carlos" 
+                    maxlength="15"
+                    class="w-full bg-dark-700 rounded-xl px-4 py-4 text-lg font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                <p id="create-error" class="text-red-400 text-sm mt-2 hidden"></p>
+            </div>
+            
+            <button onclick="createRoom()" id="btn-create" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold">
+                Crear Sala
+            </button>
+        </div>
+    </div>
+    
+    <!-- ==================== PANTALLA UNIRSE ==================== -->
+    <div id="screen-join" class="screen flex-col items-center justify-center min-h-screen p-6">
+        <button onclick="showScreen('home')" class="absolute top-6 left-6 text-gray-400 hover:text-white transition">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </button>
+        
+        <div class="text-center mb-8 animate-fade-in">
+            <div class="text-5xl mb-4">🚪</div>
+            <h2 class="text-2xl font-bold">Unirse a Partida</h2>
+            <p class="text-gray-400 mt-2">Ingresa el código de la sala</p>
+        </div>
+        
+        <div class="w-full max-w-sm animate-slide-up">
+            <div class="glass rounded-2xl p-6 mb-6 space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Tu nombre</label>
+                    <input 
+                        type="text" 
+                        id="join-name" 
+                        placeholder="Ej: María" 
+                        maxlength="15"
+                        class="w-full bg-dark-700 rounded-xl px-4 py-4 text-lg font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Código de sala</label>
+                    <input 
+                        type="text" 
+                        id="join-code" 
+                        placeholder="ABCD" 
+                        maxlength="4"
+                        class="w-full bg-dark-700 rounded-xl px-4 py-4 text-2xl font-bold text-center tracking-[0.5em] uppercase placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                </div>
+                
+                <p id="join-error" class="text-red-400 text-sm hidden"></p>
+            </div>
+            
+            <button onclick="joinRoom()" id="btn-join" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold">
+                Unirse
+            </button>
+        </div>
+    </div>
+    
+    <!-- ==================== PANTALLA LOBBY ==================== -->
+    <div id="screen-lobby" class="screen flex-col min-h-screen">
+        <!-- Header -->
+        <div class="glass p-4 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-gray-400">CÓDIGO DE SALA</p>
+                <p id="lobby-code" class="text-2xl font-black tracking-widest text-purple-400">----</p>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-gray-400">JUGADORES</p>
+                <p id="lobby-count" class="text-2xl font-bold">0</p>
+            </div>
+        </div>
+        
+        <!-- Lista de jugadores -->
+        <div class="flex-1 p-4 overflow-y-auto">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">JUGADORES EN LA SALA</h3>
+            <div id="players-list" class="space-y-2">
+                <!-- Jugadores dinámicos -->
+            </div>
+        </div>
+        
+        <!-- Panel de configuración (solo host) -->
+        <div id="host-controls" class="hidden">
+            <div class="glass p-4 mx-4 mb-4 rounded-2xl space-y-5">
+                <h3 class="text-sm font-semibold text-gray-400">⚙️ CONFIGURACIÓN</h3>
+                
+                <!-- Número de impostores -->
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm">Impostores</span>
+                        <span id="impostor-count-display" class="font-bold text-impostor">1</span>
+                    </div>
+                    <input 
+                        type="range" 
+                        id="impostor-slider" 
+                        min="1" 
+                        max="3" 
+                        value="1" 
+                        class="w-full"
+                        onchange="updateSettings()"
+                    >
+                </div>
+                
+                <!-- Modo pista -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">Modo Pista para Impostores</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="hint-mode" class="sr-only peer" onchange="updateSettings()">
+                        <div class="w-14 h-8 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                
+                <!-- Categorías -->
+                <div>
+                    <span class="text-sm block mb-3">Categorías</span>
+                    <div id="categories-container" class="flex flex-wrap gap-2">
+                        <!-- Categorías dinámicas -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botón iniciar / esperando -->
+        <div class="p-4">
+            <button 
+                id="btn-start-game" 
+                onclick="startGame()" 
+                class="btn-primary w-full py-5 rounded-2xl text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hidden"
+                disabled
+            >
+                Iniciar Partida
+            </button>
+            <div id="waiting-host" class="glass rounded-2xl py-5 text-center text-gray-400 hidden">
+                <div class="animate-pulse">⏳ Esperando al anfitrión...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== PANTALLA REVELACIÓN ==================== -->
+    <div id="screen-reveal" class="screen flex-col items-center justify-center min-h-screen p-6">
+        <div id="reveal-card" class="card-reveal w-full max-w-sm aspect-[3/4] cursor-pointer" onclick="revealCard()">
+            <div class="card-reveal-inner relative w-full h-full">
+                <!-- Frente de la carta (oculto) -->
+                <div class="card-front absolute inset-0 glass rounded-3xl flex flex-col items-center justify-center">
+                    <div class="text-6xl mb-6 animate-bounce-slow">🎴</div>
+                    <p class="text-2xl font-bold text-center">TOCA PARA<br>REVELAR</p>
+                    <p class="text-gray-400 mt-4 text-sm">Tu rol secreto te espera</p>
+                </div>
+                
+                <!-- Dorso de la carta (rol) -->
+                <div id="card-back-content" class="card-back absolute inset-0 rounded-3xl flex flex-col items-center justify-center p-8">
+                    <!-- Contenido dinámico -->
+                </div>
+            </div>
+        </div>
+        
+        <button id="btn-understood" onclick="playerReady()" class="btn-primary w-full max-w-sm py-5 rounded-2xl text-lg font-bold mt-6 hidden">
+            ¡Entendido!
+        </button>
+        
+        <div id="waiting-others" class="glass rounded-2xl py-5 px-8 text-center mt-6 hidden">
+            <p class="text-gray-300 mb-2">Esperando a los demás...</p>
+            <p class="text-2xl font-bold"><span id="ready-count">0</span>/<span id="total-count">0</span> listos</p>
+        </div>
+    </div>
+    
+    <!-- ==================== PANTALLA JUEGO ==================== -->
+    <div id="screen-game" class="screen flex-col min-h-screen">
+        <!-- Anuncio de primer jugador -->
+        <div id="first-player-announcement" class="fixed inset-0 bg-dark-900/95 flex items-center justify-center z-50 hidden">
+            <div class="text-center animate-scale-in p-8">
+                <div class="text-6xl mb-6">🎯</div>
+                <p class="text-xl text-gray-400 mb-2">¡EMPIEZA PREGUNTANDO!</p>
+                <p id="first-player-name" class="text-4xl font-black bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent"></p>
+            </div>
+        </div>
+        
+        <!-- Header con timer -->
+        <div class="glass p-4 flex items-center justify-between">
+            <div id="game-role-badge" class="px-4 py-2 rounded-full text-sm font-bold">
+                <!-- Rol del jugador -->
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <p class="text-xs text-gray-400">TIEMPO</p>
+                    <p id="game-timer" class="text-2xl font-bold font-mono">5:00</p>
+                </div>
+                <svg class="timer-ring w-12 h-12" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
+                    <circle id="timer-circle" cx="18" cy="18" r="16" fill="none" stroke="#6366f1" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="0" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+        
+        <!-- Info del juego -->
+        <div class="p-4">
+            <div id="game-word-container" class="glass rounded-2xl p-6 text-center mb-4">
+                <p class="text-xs text-gray-400 mb-2" id="game-category-label">CATEGORÍA</p>
+                <p id="game-word-display" class="text-3xl font-black"></p>
+            </div>
+            
+            <div id="game-hint-container" class="glass rounded-2xl p-4 text-center mb-4 hidden">
+                <p class="text-xs text-gray-400 mb-1">💡 PISTA</p>
+                <p id="game-hint-display" class="text-lg font-medium text-yellow-400"></p>
+            </div>
+        </div>
+        
+        <!-- Lista de jugadores para acusar -->
+        <div class="flex-1 p-4 overflow-y-auto">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">JUGADORES</h3>
+            <div id="game-players-list" class="space-y-2">
+                <!-- Jugadores dinámicos -->
+            </div>
+        </div>
+        
+        <!-- Controles del host -->
+        <div id="game-host-controls" class="p-4 hidden">
+            <button onclick="revealResults()" class="btn-secondary w-full py-4 rounded-2xl font-bold text-red-400 border-red-400/30">
+                🔍 Revelar Impostores
+            </button>
+        </div>
+    </div>
+    
+    <!-- ==================== PANTALLA RESULTADOS ==================== -->
+    <div id="screen-results" class="screen flex-col min-h-screen p-6">
+        <div class="text-center mb-6 animate-fade-in">
+            <div class="text-6xl mb-4">🎭</div>
+            <h2 class="text-2xl font-bold">Resultados</h2>
+        </div>
+        
+        <div class="glass rounded-2xl p-6 mb-6 text-center animate-slide-up">
+            <p class="text-xs text-gray-400 mb-2" id="result-category">CATEGORÍA</p>
+            <p class="text-3xl font-black text-citizen" id="result-word">PALABRA</p>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto mb-4">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">ROLES REVELADOS</h3>
+            <div id="results-list" class="space-y-2">
+                <!-- Resultados dinámicos -->
+            </div>
+        </div>
+        
+        <button id="btn-new-round" onclick="newRound()" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold hidden">
+            🔄 Nueva Ronda
+        </button>
+        
+        <div id="waiting-new-round" class="glass rounded-2xl py-5 text-center text-gray-400 hidden">
+            <div class="animate-pulse">⏳ Esperando nueva ronda...</div>
+        </div>
+    </div>
+    
+    <!-- ==================== TOAST NOTIFICACIONES ==================== -->
+    <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        // ============================================
+        // ESTADO DE LA APLICACIÓN
+        // ============================================
+        const state = {
+            socket: null,
+            roomCode: null,
+            isHost: false,
+            playerName: null,
+            myRole: null,
+            myWord: null,
+            myHint: null,
+            categories: [],
+            selectedCategories: ['animales', 'profesiones', 'lugares'],
+            players: [],
+            timerInterval: null,
+            cardRevealed: false,
+            isReady: false
+        };
+        
+        // ============================================
+        // INICIALIZACIÓN
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Conectar al servidor Socket.io
+            state.socket = io();
+            
+            // Configurar eventos del socket
+            setupSocketEvents();
+            
+            // Auto-uppercase para código de sala
+            document.getElementById('join-code').addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase();
+            });
+        });
+        
+        // ============================================
+        // NAVEGACIÓN ENTRE PANTALLAS
+        // ============================================
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(`screen-${screenId}`).classList.add('active');
+        }
+        
+        // ============================================
+        // CREAR SALA
+        // ============================================
+        function createRoom() {
+            const nameInput = document.getElementById('create-name');
+            const errorEl = document.getElementById('create-error');
+            const name = nameInput.value.trim();
+            
+            if (name.length < 2) {
+                showError(errorEl, 'El nombre debe tener al menos 2 caracteres');
+                nameInput.classList.add('shake');
+                setTimeout(() => nameInput.classList.remove('shake'), 500);
+                return;
+            }
+            
+            hideError(errorEl);
+            state.playerName = name;
+            
+            state.socket.emit('createRoom', { playerName: name }, (response) => {
+                if (response.success) {
+                    state.roomCode = response.roomCode;
+                    state.isHost = true;
+                    state.categories = response.categories;
+                    enterLobby();
+                } else {
+                    showError(errorEl, response.error);
+                }
+            });
+        }
+        
+        // ============================================
+        // UNIRSE A SALA
+        // ============================================
+        function joinRoom() {
+            const nameInput = document.getElementById('join-name');
+            const codeInput = document.getElementById('join-code');
+            const errorEl = document.getElementById('join-error');
+            
+            const name = nameInput.value.trim();
+            const code = codeInput.value.trim().toUpperCase();
+            
+            if (name.length < 2) {
+                showError(errorEl, 'El nombre debe tener al menos 2 caracteres');
+                nameInput.classList.add('shake');
+                setTimeout(() => nameInput.classList.remove('shake'), 500);
+                return;
+            }
+            
+            if (code.length !== 4) {
+                showError(errorEl, 'El código debe tener 4 letras');
+                codeInput.classList.add('shake');
+                setTimeout(() => codeInput.classList.remove('shake'), 500);
+                return;
+            }
+            
+            hideError(errorEl);
+            state.playerName = name;
+            
+            state.socket.emit('joinRoom', { playerName: name, roomCode: code }, (response) => {
+                if (response.success) {
+                    state.roomCode = response.roomCode;
+                    state.isHost = response.isHost;
+                    state.categories = response.categories;
+                    enterLobby();
+                } else {
+                    showError(errorEl, response.error);
+                }
+            });
+        }
+        
+        // ============================================
+        // ENTRAR AL LOBBY
+        // ============================================
+        function enterLobby() {
+            showScreen('lobby');
+            document.getElementById('lobby-code').textContent = state.roomCode;
+            
+            // Mostrar/ocultar controles según rol
+            if (state.isHost) {
+                document.getElementById('host-controls').classList.remove('hidden');
+                document.getElementById('btn-start-game').classList.remove('hidden');
+                document.getElementById('waiting-host').classList.add('hidden');
+                renderCategories();
+            } else {
+                document.getElementById('host-controls').classList.add('hidden');
+                document.getElementById('btn-start-game').classList.add('hidden');
+                document.getElementById('waiting-host').classList.remove('hidden');
+            }
+        }
+        
+        // ============================================
+        // RENDERIZAR CATEGORÍAS
+        // ============================================
+        function renderCategories() {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = '';
+            
+            state.categories.forEach(cat => {
+                const isSelected = state.selectedCategories.includes(cat.id);
+                const chip = document.createElement('button');
+                chip.className = `category-chip px-4 py-2 rounded-full text-sm font-medium border transition ${
+                    isSelected 
+                        ? 'selected bg-purple-500/20 border-purple-500 text-purple-300' 
+                        : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                }`;
+                chip.textContent = cat.name;
+                chip.dataset.categoryId = cat.id;
+                chip.onclick = () => toggleCategory(cat.id);
+                container.appendChild(chip);
+            });
+        }
+        
+        function toggleCategory(categoryId) {
+            const index = state.selectedCategories.indexOf(categoryId);
+            if (index > -1) {
+                if (state.selectedCategories.length > 1) {
+                    state.selectedCategories.splice(index, 1);
+                }
+            } else {
+                state.selectedCategories.push(categoryId);
+            }
+            renderCategories();
+            updateSettings();
+        }
+        
+        // ============================================
+        // ACTUALIZAR CONFIGURACIÓN
+        // ============================================
+        function updateSettings() {
+            if (!state.isHost) return;
+            
+            const impostorCount = parseInt(document.getElementById('impostor-slider').value);
+            const hintMode = document.getElementById('hint-mode').checked;
+            
+            document.getElementById('impostor-count-display').textContent = impostorCount;
+            
+            state.socket.emit('updateSettings', {
+                impostorCount,
+                hintMode,
+                selectedCategories: state.selectedCategories
+            });
+        }
+        
+        // ============================================
+        // RENDERIZAR JUGADORES
+        // ============================================
+        function renderPlayers(players) {
+            state.players = players;
+            const container = document.getElementById('players-list');
+            container.innerHTML = '';
+            
+            document.getElementById('lobby-count').textContent = players.length;
+            
+            players.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = 'player-item glass rounded-xl p-4 flex items-center justify-between';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold">
+                            ${player.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <p class="font-semibold">${escapeHtml(player.name)}</p>
+                            ${player.isHost ? '<p class="text-xs text-purple-400">👑 Anfitrión</p>' : ''}
+                        </div>
+                    </div>
+                    <div class="text-2xl">${player.isHost ? '👑' : '🎮'}</div>
+                `;
+                container.appendChild(item);
+            });
+            
+            // Actualizar estado del botón de inicio
+            updateStartButton();
+        }
+        
+        function updateStartButton() {
+            if (!state.isHost) return;
+            const btn = document.getElementById('btn-start-game');
+            const playerCount = state.players.length;
+            
+            if (playerCount >= 3) {
+                btn.disabled = false;
+                btn.textContent = `Iniciar Partida (${playerCount} jugadores)`;
+            } else {
+                btn.disabled = true;
+                btn.textContent = `Necesitas ${3 - playerCount} jugador(es) más`;
+            }
+        }
+        
+        // ============================================
+        // INICIAR PARTIDA
+        // ============================================
+        function startGame() {
+            if (!state.isHost) return;
+            
+            state.socket.emit('startGame', (response) => {
+                if (!response.success) {
+                    showToast(response.error, 'error');
+                }
+            });
+        }
+        
+        // ============================================
+        // FASE DE REVELACIÓN
+        // ============================================
+        function showRevealScreen(data) {
+            state.myRole = data.role;
+            state.myWord = data.word;
+            state.myHint = data.hint;
+            state.cardRevealed = false;
+            state.isReady = false;
+            
+            // Resetear tarjeta
+            document.getElementById('reveal-card').classList.remove('revealed');
+            document.getElementById('btn-understood').classList.add('hidden');
+            document.getElementById('waiting-others').classList.add('hidden');
+            document.getElementById('total-count').textContent = data.totalPlayers;
+            document.getElementById('ready-count').textContent = '0';
+            
+            // Preparar contenido del dorso
+            const cardBack = document.getElementById('card-back-content');
+            
+            if (data.role === 'citizen') {
+                cardBack.className = 'card-back absolute inset-0 rounded-3xl flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-900 to-blue-700 glow-citizen';
+                cardBack.innerHTML = `
+                    <div class="text-5xl mb-4">🔵</div>
+                    <p class="text-lg text-blue-200 mb-2">ERES</p>
+                    <p class="text-3xl font-black mb-6">CIUDADANO</p>
+                    <div class="bg-white/20 rounded-xl p-4 w-full">
+                        <p class="text-xs text-blue-200 mb-1">${data.category}</p>
+                        <p class="text-2xl font-bold">${data.word}</p>
+                    </div>
+                    <p class="text-sm text-blue-200 mt-4 text-center">Describe la palabra sin decirla.<br>¡Encuentra al impostor!</p>
+                `;
+            } else {
+                cardBack.className = 'card-back absolute inset-0 rounded-3xl flex flex-col items-center justify-center p-8 bg-gradient-to-br from-red-900 to-red-700 glow-impostor';
+                let hintHtml = '';
+                if (data.hint) {
+                    hintHtml = `
+                        <div class="bg-white/20 rounded-xl p-4 w-full mb-4">
+                            <p class="text-xs text-red-200 mb-1">💡 PISTA</p>
+                            <p class="text-lg font-medium">${data.hint}</p>
+                        </div>
+                    `;
+                }
+                cardBack.innerHTML = `
+                    <div class="text-5xl mb-4">🔴</div>
+                    <p class="text-lg text-red-200 mb-2">ERES EL</p>
+                    <p class="text-4xl font-black mb-6">IMPOSTOR</p>
+                    ${hintHtml}
+                    <p class="text-xs text-red-200 mb-1">${data.category}</p>
+                    <p class="text-sm text-red-200 text-center mt-2">No conoces la palabra.<br>¡Finge que sí!</p>
+                `;
+            }
+            
+            showScreen('reveal');
+        }
+        
+        function revealCard() {
+            if (state.cardRevealed) return;
+            
+            state.cardRevealed = true;
+            document.getElementById('reveal-card').classList.add('revealed');
+            
+            setTimeout(() => {
+                document.getElementById('btn-understood').classList.remove('hidden');
+            }, 700);
+        }
+        
+        function playerReady() {
+            if (state.isReady) return;
+            
+            state.isReady = true;
+            document.getElementById('btn-understood').classList.add('hidden');
+            document.getElementById('waiting-others').classList.remove('hidden');
+            
+            state.socket.emit('playerReady');
+        }
+        
+        // ============================================
+        // FASE DE JUEGO
+        // ============================================
+        function showGameScreen(data) {
+            // Mostrar anuncio del primer jugador
+            document.getElementById('first-player-name').textContent = data.firstPlayerName;
+            document.getElementById('first-player-announcement').classList.remove('hidden');
+            
+            setTimeout(() => {
+                document.getElementById('first-player-announcement').classList.add('hidden');
+            }, 3000);
+            
+            // Configurar pantalla de juego
+            const roleBadge = document.getElementById('game-role-badge');
+            if (state.myRole === 'citizen') {
+                roleBadge.className = 'px-4 py-2 rounded-full text-sm font-bold bg-citizen/20 text-citizen';
+                roleBadge.textContent = '🔵 Ciudadano';
+                document.getElementById('game-word-display').textContent = state.myWord;
+                document.getElementById('game-hint-container').classList.add('hidden');
+            } else {
+                roleBadge.className = 'px-4 py-2 rounded-full text-sm font-bold bg-impostor/20 text-impostor';
+                roleBadge.textContent = '🔴 Impostor';
+                document.getElementById('game-word-display').textContent = '???';
+                
+                if (state.myHint) {
+                    document.getElementById('game-hint-container').classList.remove('hidden');
+                    document.getElementById('game-hint-display').textContent = state.myHint;
+                } else {
+                    document.getElementById('game-hint-container').classList.add('hidden');
+                }
+            }
+            
+            // Mostrar/ocultar controles de host
+            if (state.isHost) {
+                document.getElementById('game-host-controls').classList.remove('hidden');
+            } else {
+                document.getElementById('game-host-controls').classList.add('hidden');
+            }
+            
+            // Iniciar timer
+            startTimer(data.timerEndTime, data.duration);
+            
+            // Renderizar lista de jugadores
+            renderGamePlayers();
+            
+            showScreen('game');
+        }
+        
+        function renderGamePlayers() {
+            const container = document.getElementById('game-players-list');
+            container.innerHTML = '';
+            
+            state.players.forEach(player => {
+                const item = document.createElement('div');
+                item.className = 'glass rounded-xl p-4 flex items-center justify-between';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold">
+                            ${player.name.charAt(0).toUpperCase()}
+                        </div>
+                        <p class="font-semibold">${escapeHtml(player.name)}</p>
+                    </div>
+                    <button 
+                        onclick="accusePlayer('${player.id}')" 
+                        class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition"
+                    >
+                        Acusar
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        function accusePlayer(playerId) {
+            state.socket.emit('accusePlayer', { accusedId: playerId });
+        }
+        
+        // ============================================
+        // TIMER
+        // ============================================
+        function startTimer(endTime, duration) {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+            }
+            
+            const timerEl = document.getElementById('game-timer');
+            const circleEl = document.getElementById('timer-circle');
+            const circumference = 2 * Math.PI * 16;
+            circleEl.style.strokeDasharray = circumference;
+            
+            function updateTimer() {
+                const now = Date.now();
+                const remaining = Math.max(0, endTime - now);
+                const seconds = Math.floor(remaining / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                
+                timerEl.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+                
+                const progress = remaining / (duration * 1000);
+                const offset = circumference * (1 - progress);
+                circleEl.style.strokeDashoffset = offset;
+                
+                if (seconds <= 30) {
+                    circleEl.style.stroke = '#ef4444';
+                } else if (seconds <= 60) {
+                    circleEl.style.stroke = '#f59e0b';
+                } else {
+                    circleEl.style.stroke = '#6366f1';
+                }
+                
+                if (remaining <= 0) {
+                    clearInterval(state.timerInterval);
+                    timerEl.textContent = '0:00';
+                }
+            }
+            
+            updateTimer();
+            state.timerInterval = setInterval(updateTimer, 1000);
+        }
+        
+        // ============================================
+        // RESULTADOS
+        // ============================================
+        function revealResults() {
+            if (!state.isHost) return;
+            state.socket.emit('revealResults');
+        }
+        
+        function showResultsScreen(data) {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+            }
+            
+            document.getElementById('result-category').textContent = data.category;
+            document.getElementById('result-word').textContent = data.word;
+            
+            const container = document.getElementById('results-list');
+            container.innerHTML = '';
+            
+            data.players.forEach(player => {
+                const item = document.createElement('div');
+                const roleClass = player.role === 'impostor' 
+                    ? 'bg-impostor/20 border-impostor/30' 
+                    : 'bg-citizen/20 border-citizen/30';
+                const roleText = player.role === 'impostor' ? '🔴 Impostor' : '🔵 Ciudadano';
+                const roleColor = player.role === 'impostor' ? 'text-impostor' : 'text-citizen';
+                
+                item.className = `rounded-xl p-4 flex items-center justify-between border ${roleClass} animate-slide-up`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br ${player.role === 'impostor' ? 'from-red-500 to-red-700' : 'from-blue-500 to-blue-700'} flex items-center justify-center font-bold">
+                            ${player.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <p class="font-semibold">${escapeHtml(player.name)}</p>
+                            ${player.isHost ? '<p class="text-xs text-purple-400">👑 Anfitrión</p>' : ''}
+                        </div>
+                    </div>
+                    <span class="font-bold ${roleColor}">${roleText}</span>
+                `;
+                container.appendChild(item);
+            });
+            
+            // Mostrar/ocultar botones según rol
+            if (state.isHost) {
+                document.getElementById('btn-new-round').classList.remove('hidden');
+                document.getElementById('waiting-new-round').classList.add('hidden');
+            } else {
+                document.getElementById('btn-new-round').classList.add('hidden');
+                document.getElementById('waiting-new-round').classList.remove('hidden');
+            }
+            
+            showScreen('results');
+        }
+        
+        function newRound() {
+            if (!state.isHost) return;
+            state.socket.emit('newRound');
+        }
+        
+        // ============================================
+        // EVENTOS DE SOCKET
+        // ============================================
+        function setupSocketEvents() {
+            const socket = state.socket;
+            
+            // Actualización de jugadores
+            socket.on('playersUpdate', (players) => {
+                renderPlayers(players);
+            });
+            
+            // Actualización de configuración
+            socket.on('settingsUpdate', (settings) => {
+                document.getElementById('impostor-slider').value = settings.impostorCount;
+                document.getElementById('impostor-count-display').textContent = settings.impostorCount;
+                document.getElementById('hint-mode').checked = settings.hintMode;
+                state.selectedCategories = settings.selectedCategories;
+                if (state.isHost) {
+                    renderCategories();
+                }
+            });
+            
+            // Juego iniciado
+            socket.on('gameStarted', (data) => {
+                showRevealScreen(data);
+            });
+            
+            // Progreso de jugadores listos
+            socket.on('readyProgress', (data) => {
+                document.getElementById('ready-count').textContent = data.ready;
+                document.getElementById('total-count').textContent = data.total;
+            });
+            
+            // Inicio de ronda
+            socket.on('roundStart', (data) => {
+                showGameScreen(data);
+            });
+            
+            // Jugador acusado
+            socket.on('playerAccused', (data) => {
+                showToast(`${data.accuserName} acusa a ${data.accusedName}`, 'warning');
+            });
+            
+            // Resultados del juego
+            socket.on('gameResults', (data) => {
+                showResultsScreen(data);
+            });
+            
+            // Volver al lobby
+            socket.on('backToLobby', () => {
+                state.myRole = null;
+                state.myWord = null;
+                state.myHint = null;
+                state.cardRevealed = false;
+                state.isReady = false;
+                enterLobby();
+            });
+            
+            // Cambio de host
+            socket.on('hostChanged', (data) => {
+                if (data.newHostId === socket.id) {
+                    state.isHost = true;
+                    showToast('¡Ahora eres el anfitrión!', 'success');
+                }
+                showToast(`${data.newHostName} es el nuevo anfitrión`, 'info');
+                
+                // Actualizar UI si estamos en lobby
+                const currentScreen = document.querySelector('.screen.active')?.id;
+                if (currentScreen === 'screen-lobby') {
+                    enterLobby();
+                }
+            });
+            
+            // Jugador desconectado
+            socket.on('playerDisconnected', (data) => {
+                showToast(`${data.playerName} se ha desconectado`, 'warning');
+            });
+            
+            // Desconexión
+            socket.on('disconnect', () => {
+                showToast('Conexión perdida. Reconectando...', 'error');
+            });
+            
+            // Reconexión
+            socket.on('connect', () => {
+                if (state.roomCode) {
+                    showToast('Reconectado', 'success');
+                }
+            });
+        }
+        
+        // ============================================
+        // UTILIDADES
+        // ============================================
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+        
+        function hideError(element) {
+            element.classList.add('hidden');
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                info: 'bg-blue-500/90',
+                success: 'bg-green-500/90',
+                warning: 'bg-yellow-500/90',
+                error: 'bg-red-500/90'
+            };
+            
+            toast.className = `${colors[type]} rounded-xl px-4 py-3 text-white font-medium shadow-lg animate-slide-up`;
+            toast.textContent = message;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "el-impostor",
+  "version": "1.0.0",
+  "description": "Juego de deducción social multijugador en tiempo real",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "socket.io",
+    "impostor",
+    "deduction"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
