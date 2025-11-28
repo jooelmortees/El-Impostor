@@ -145,7 +145,7 @@ export async function isNameTakenInRoom(roomId, name, excludePlayerId = null) {
 export async function resetPlayersForNewRound(roomId) {
     const { error } = await supabase
         .from('players')
-        .update({ role: null, is_ready: false })
+        .update({ role: null, is_ready: false, is_eliminated: false })
         .eq('room_id', roomId);
     
     if (error) throw error;

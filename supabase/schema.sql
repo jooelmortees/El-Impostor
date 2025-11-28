@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS players (
     role VARCHAR(10) CHECK (role IN ('citizen', 'impostor', NULL)),
     is_ready BOOLEAN DEFAULT FALSE,
     is_connected BOOLEAN DEFAULT TRUE,
+    is_eliminated BOOLEAN DEFAULT FALSE,
     last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -160,3 +161,9 @@ CREATE POLICY "Events are deletable by everyone" ON game_events
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
 ALTER PUBLICATION supabase_realtime ADD TABLE players;
 ALTER PUBLICATION supabase_realtime ADD TABLE game_events;
+
+-- ============================================
+-- MIGRACIÓN: Agregar columna is_eliminated (si no existe)
+-- ============================================
+-- Ejecutar esto si ya tienes la base de datos creada:
+ALTER TABLE players ADD COLUMN IF NOT EXISTS is_eliminated BOOLEAN DEFAULT FALSE;

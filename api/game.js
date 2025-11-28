@@ -164,7 +164,10 @@ async function handleReady(req, res) {
     });
 }
 
-async function handleAccuse(req, res) {
+// Estado de votaciones activas en memoria (se resetea si la función se reinicia)
+const activeVotings = new Map();
+
+async function handleStartVote(req, res) {
     const { roomCode, playerId, accusedId } = req.body;
     
     if (!roomCode || !playerId || !accusedId) {
@@ -183,8 +186,17 @@ async function handleAccuse(req, res) {
         });
     }
     
+    // Verificar si ya hay una votación activa
+    if (activeVotings.has(roomCode)) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Ya hay una votación en curso' 
+        });
+    }
+    
     const accuser = await getPlayerById(playerId);
     const accused = await getPlayerById(accusedId);
+    const players = await getPlayersByRoom(room.id);
     
     if (!accuser || !accused) {
         return res.status(404).json({ 
@@ -193,11 +205,209 @@ async function handleAccuse(req, res) {
         });
     }
     
-    await emitGameEvent(roomCode, 'player_accused', {
-        accuserName: accuser.name,
+    // Verificar que no esté eliminado
+    if (accused.is_eliminated) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Este jugador ya fue eliminado' 
+        });
+    }
+    
+    // Crear votación
+    const votingData = {
+        accusedId: accusedId,
         accusedName: accused.name,
-        accusedId: accusedId
+        accuserName: accuser.name,
+        votes: {}, // playerId -> vote ('guilty', 'innocent', 'null')
+        totalVoters: players.filter(p => !p.is_eliminated).length,
+        startTime: Date.now()
+    };
+    
+    activeVotings.set(roomCode, votingData);
+    
+    // Emitir evento de inicio de votación
+    await emitGameEvent(roomCode, 'voting_started', {
+        accusedId: accusedId,
+        accusedName: accused.name,
+        accuserName: accuser.name,
+        totalVoters: votingData.totalVoters
     });
+    
+    return res.status(200).json({ success: true });
+}
+
+async function handleCastVote(req, res) {
+    const { roomCode, playerId, vote } = req.body;
+    
+    if (!roomCode || !playerId || !vote) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    if (!['guilty', 'innocent', 'null'].includes(vote)) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Voto no válido' 
+        });
+    }
+    
+    const votingData = activeVotings.get(roomCode);
+    
+    if (!votingData) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'No hay votación activa' 
+        });
+    }
+    
+    // Verificar que no haya votado ya
+    if (votingData.votes[playerId]) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Ya has votado' 
+        });
+    }
+    
+    const player = await getPlayerById(playerId);
+    if (!player || player.is_eliminated) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'No puedes votar' 
+        });
+    }
+    
+    // Registrar voto
+    votingData.votes[playerId] = vote;
+    
+    const voteCount = Object.keys(votingData.votes).length;
+    
+    // Emitir progreso de votación
+    await emitGameEvent(roomCode, 'vote_progress', {
+        votesCount: voteCount,
+        totalVoters: votingData.totalVoters
+    });
+    
+    // Si todos han votado, calcular resultado
+    if (voteCount >= votingData.totalVoters) {
+        await resolveVoting(roomCode, votingData);
+    }
+    
+    return res.status(200).json({ 
+        success: true,
+        votesCount: voteCount,
+        totalVoters: votingData.totalVoters
+    });
+}
+
+async function resolveVoting(roomCode, votingData) {
+    const room = await getRoomByCode(roomCode);
+    if (!room) return;
+    
+    // Contar votos (los nulos no cuentan)
+    let guiltyVotes = 0;
+    let innocentVotes = 0;
+    let nullVotes = 0;
+    
+    Object.values(votingData.votes).forEach(vote => {
+        if (vote === 'guilty') guiltyVotes++;
+        else if (vote === 'innocent') innocentVotes++;
+        else nullVotes++;
+    });
+    
+    const validVotes = guiltyVotes + innocentVotes;
+    const majorityNeeded = Math.floor(validVotes / 2) + 1;
+    const isEliminated = guiltyVotes >= majorityNeeded;
+    
+    let eliminatedPlayer = null;
+    let gameOver = false;
+    let impostorsWin = false;
+    
+    if (isEliminated) {
+        // Eliminar al jugador acusado
+        await updatePlayer(votingData.accusedId, { is_eliminated: true });
+        eliminatedPlayer = await getPlayerById(votingData.accusedId);
+        
+        // Verificar condición de victoria
+        const players = await getPlayersByRoom(room.id);
+        const alivePlayers = players.filter(p => !p.is_eliminated);
+        const aliveImpostors = alivePlayers.filter(p => p.role === 'impostor');
+        const aliveCitizens = alivePlayers.filter(p => p.role === 'citizen');
+        
+        if (aliveImpostors.length === 0) {
+            // Ciudadanos ganan
+            gameOver = true;
+            impostorsWin = false;
+        } else if (aliveImpostors.length >= aliveCitizens.length) {
+            // Impostores ganan
+            gameOver = true;
+            impostorsWin = true;
+        }
+    }
+    
+    // Limpiar votación
+    activeVotings.delete(roomCode);
+    
+    // Emitir resultado de votación
+    await emitGameEvent(roomCode, 'voting_result', {
+        accusedId: votingData.accusedId,
+        accusedName: votingData.accusedName,
+        guiltyVotes,
+        innocentVotes,
+        nullVotes,
+        majorityNeeded,
+        isEliminated,
+        eliminatedRole: eliminatedPlayer?.role || null,
+        gameOver,
+        impostorsWin
+    });
+    
+    // Si el juego termina, actualizar estado y mostrar resultados
+    if (gameOver) {
+        await updateRoom(room.id, { game_state: 'results' });
+        
+        const players = await getPlayersByRoom(room.id);
+        const results = players.map(p => ({
+            id: p.id,
+            name: p.name,
+            role: p.role,
+            isHost: p.is_host,
+            isEliminated: p.is_eliminated
+        }));
+        
+        setTimeout(async () => {
+            await emitGameEvent(roomCode, 'game_results', {
+                word: room.current_word,
+                category: room.current_category,
+                players: results,
+                impostorsWin
+            });
+        }, 3000);
+    }
+}
+
+async function handleCancelVote(req, res) {
+    const { roomCode, playerId } = req.body;
+    
+    if (!roomCode || !playerId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    const room = await getRoomByCode(roomCode);
+    if (!room || room.host_id !== playerId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'Solo el anfitrión puede cancelar la votación' 
+        });
+    }
+    
+    activeVotings.delete(roomCode);
+    
+    await emitGameEvent(roomCode, 'voting_cancelled', {});
     
     return res.status(200).json({ success: true });
 }
@@ -337,8 +547,14 @@ export default async function handler(req, res) {
             case 'ready':
                 return await handleReady(req, res);
                 
-            case 'accuse':
-                return await handleAccuse(req, res);
+            case 'start-vote':
+                return await handleStartVote(req, res);
+                
+            case 'cast-vote':
+                return await handleCastVote(req, res);
+                
+            case 'cancel-vote':
+                return await handleCancelVote(req, res);
                 
             case 'results':
                 return await handleResults(req, res);
@@ -352,7 +568,7 @@ export default async function handler(req, res) {
             default:
                 return res.status(400).json({ 
                     success: false, 
-                    error: 'Acción no válida. Usa: start, ready, accuse, results, new-round, chat' 
+                    error: 'Acción no válida. Usa: start, ready, start-vote, cast-vote, cancel-vote, results, new-round, chat' 
                 });
         }
     } catch (error) {
