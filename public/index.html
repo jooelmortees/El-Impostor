@@ -263,7 +263,10 @@
             </div>
             
             <header class="glass-strong p-3 flex items-center justify-between shrink-0">
-                <div id="game-role-badge" class="px-3 py-1.5 rounded-full text-xs font-bold"></div>
+                <div class="text-left">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider">Sala</p>
+                    <p id="game-room-code" class="text-sm font-bold text-accent-400">----</p>
+                </div>
                 <div class="flex items-center gap-3">
                     <div class="text-right">
                         <p id="game-timer" class="text-lg font-bold font-mono">5:00</p>
@@ -688,14 +691,8 @@
             document.getElementById('first-player-overlay').classList.remove('hidden');
             setTimeout(() => { document.getElementById('first-player-overlay').classList.add('hidden'); }, 3000);
             
-            const badge = document.getElementById('game-role-badge');
-            if (state.myRole === 'citizen') {
-                badge.className = 'px-3 py-1.5 rounded-full text-xs font-bold bg-citizen-500/30 text-citizen-400 border border-citizen-500/30';
-                badge.textContent = '🔵 Ciudadano';
-            } else {
-                badge.className = 'px-3 py-1.5 rounded-full text-xs font-bold bg-impostor-500/30 text-impostor-400 border border-impostor-500/30';
-                badge.textContent = '🔴 Impostor';
-            }
+            // Mostrar código de sala en lugar de rol
+            document.getElementById('game-room-code').textContent = state.roomCode;
             
             if (state.isHost) document.getElementById('game-host-controls').classList.remove('hidden');
             else document.getElementById('game-host-controls').classList.add('hidden');
