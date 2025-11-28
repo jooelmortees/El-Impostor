@@ -378,7 +378,7 @@
             text.textContent = 'Creando...';
             
             try {
-                const response = await apiCall('/rooms/create', 'POST', { playerName: name });
+                const response = await apiCall('/rooms?action=create', 'POST', { playerName: name });
                 if (response.success) {
                     state.roomCode = response.roomCode;
                     state.roomId = response.roomId;
@@ -426,7 +426,7 @@
             text.textContent = 'Uniendo...';
             
             try {
-                const response = await apiCall('/rooms/join', 'POST', { playerName: name, roomCode: code });
+                const response = await apiCall('/rooms?action=join', 'POST', { playerName: name, roomCode: code });
                 if (response.success) {
                     state.roomCode = response.roomCode;
                     state.roomId = response.roomId;
@@ -516,7 +516,7 @@
         
         async function fetchPlayers() {
             try {
-                const response = await apiCall(`/rooms/players?roomCode=${state.roomCode}`);
+                const response = await apiCall(`/rooms?action=players&roomCode=${state.roomCode}`);
                 if (response.success) {
                     renderPlayers(response.players);
                     if (response.settings) handleSettingsUpdate(response.settings);
@@ -527,7 +527,7 @@
         function startHeartbeat() {
             if (state.heartbeatInterval) clearInterval(state.heartbeatInterval);
             state.heartbeatInterval = setInterval(async () => {
-                try { await apiCall('/rooms/heartbeat', 'POST', { playerId: state.playerId }); } catch (error) {}
+                try { await apiCall('/rooms?action=heartbeat', 'POST', { playerId: state.playerId }); } catch (error) {}
             }, 10000);
         }
         
@@ -540,7 +540,7 @@
             stopHeartbeat();
             stopPlayersPolling();
             if (state.realtimeChannel) supabase.removeChannel(state.realtimeChannel);
-            try { await apiCall('/rooms/leave', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); } catch (error) {}
+            try { await apiCall('/rooms?action=leave', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); } catch (error) {}
         }
         
         function renderCategories() {
@@ -570,7 +570,7 @@
             const hintMode = document.getElementById('hint-mode').checked;
             document.getElementById('impostor-count-display').textContent = impostorCount;
             try {
-                await apiCall('/rooms/settings', 'POST', { roomCode: state.roomCode, playerId: state.playerId, settings: { impostorCount, hintMode, selectedCategories: state.selectedCategories } });
+                await apiCall('/rooms?action=settings', 'POST', { roomCode: state.roomCode, playerId: state.playerId, settings: { impostorCount, hintMode, selectedCategories: state.selectedCategories } });
             } catch (error) { showToast('Error al guardar configuración', 'error'); }
         }
         
@@ -608,7 +608,7 @@
         async function startGame() {
             if (!state.isHost) return;
             try {
-                const response = await apiCall('/game/start', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
+                const response = await apiCall('/game?action=start', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
                 if (!response.success) showToast(response.error, 'error');
             } catch (error) { showToast('Error al iniciar partida', 'error'); }
         }
@@ -656,7 +656,7 @@
             state.isReady = true;
             document.getElementById('btn-understood').classList.add('hidden');
             document.getElementById('waiting-others').classList.remove('hidden');
-            try { await apiCall('/game/ready', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
+            try { await apiCall('/game?action=ready', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
             catch (error) { showToast('Error al marcar como listo', 'error'); }
         }
         
@@ -710,7 +710,7 @@
         }
         
         async function accusePlayer(playerId) {
-            try { await apiCall('/game/accuse', 'POST', { roomCode: state.roomCode, playerId: state.playerId, accusedId: playerId }); }
+            try { await apiCall('/game?action=accuse', 'POST', { roomCode: state.roomCode, playerId: state.playerId, accusedId: playerId }); }
             catch (error) { showToast('Error al acusar', 'error'); }
         }
         
@@ -742,7 +742,7 @@
         
         async function revealResults() {
             if (!state.isHost) return;
-            try { await apiCall('/game/results', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
+            try { await apiCall('/game?action=results', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
             catch (error) { showToast('Error al revelar resultados', 'error'); }
         }
         
@@ -768,7 +768,7 @@
         
         async function newRound() {
             if (!state.isHost) return;
-            try { await apiCall('/game/new-round', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
+            try { await apiCall('/game?action=new-round', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
             catch (error) { showToast('Error al iniciar nueva ronda', 'error'); }
         }
         

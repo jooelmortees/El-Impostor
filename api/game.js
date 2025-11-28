@@ -1,0 +1,341 @@
+import { 
+    getRoomByCode, 
+    updateRoom,
+    getPlayersByRoom,
+    getPlayerById,
+    updatePlayer,
+    resetPlayersForNewRound,
+    emitGameEvent
+} from './lib/supabase.js';
+import { selectRandomWord } from './lib/game-data.js';
+
+// CORS helper
+function setCorsHeaders(res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+// Handlers para cada acción
+async function handleStart(req, res) {
+    const { roomCode, playerId } = req.body;
+    
+    if (!roomCode || !playerId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    const room = await getRoomByCode(roomCode);
+    
+    if (!room) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Sala no encontrada' 
+        });
+    }
+    
+    if (room.host_id !== playerId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'Solo el anfitrión puede iniciar la partida' 
+        });
+    }
+    
+    const players = await getPlayersByRoom(room.id);
+    
+    if (players.length < 3) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Se necesitan al menos 3 jugadores' 
+        });
+    }
+    
+    const settings = room.settings || { selectedCategories: ['animales'], impostorCount: 1, hintMode: false };
+    const { word, hint, categoryName } = selectRandomWord(settings.selectedCategories);
+    
+    const impostorCount = Math.min(settings.impostorCount || 1, Math.floor(players.length / 3));
+    const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+    
+    for (let i = 0; i < shuffledPlayers.length; i++) {
+        const role = i < impostorCount ? 'impostor' : 'citizen';
+        await updatePlayer(shuffledPlayers[i].id, { 
+            role, 
+            is_ready: false 
+        });
+    }
+    
+    await updateRoom(room.id, {
+        game_state: 'revealing',
+        current_word: word,
+        current_hint: hint,
+        current_category: categoryName,
+        first_player_id: null
+    });
+    
+    const rolesData = {};
+    for (let i = 0; i < shuffledPlayers.length; i++) {
+        const role = i < impostorCount ? 'impostor' : 'citizen';
+        rolesData[shuffledPlayers[i].id] = {
+            role,
+            word: role === 'citizen' ? word : null,
+            hint: role === 'impostor' && settings.hintMode ? hint : null,
+            category: categoryName
+        };
+    }
+    
+    await emitGameEvent(roomCode, 'game_started', {
+        roles: rolesData,
+        totalPlayers: players.length,
+        category: categoryName
+    });
+    
+    return res.status(200).json({
+        success: true,
+        message: 'Partida iniciada'
+    });
+}
+
+async function handleReady(req, res) {
+    const { roomCode, playerId } = req.body;
+    
+    if (!roomCode || !playerId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    const room = await getRoomByCode(roomCode);
+    
+    if (!room) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Sala no encontrada' 
+        });
+    }
+    
+    if (room.game_state !== 'revealing') {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'La partida no está en fase de revelación' 
+        });
+    }
+    
+    await updatePlayer(playerId, { is_ready: true });
+    
+    const players = await getPlayersByRoom(room.id);
+    const readyCount = players.filter(p => p.is_ready).length;
+    const totalCount = players.length;
+    
+    await emitGameEvent(roomCode, 'ready_progress', {
+        ready: readyCount,
+        total: totalCount
+    });
+    
+    if (readyCount >= totalCount) {
+        const citizens = players.filter(p => p.role === 'citizen');
+        const pool = citizens.length > 0 ? citizens : players;
+        const firstPlayer = pool[Math.floor(Math.random() * pool.length)];
+        
+        const roundDuration = room.round_duration || 300;
+        const timerEndTime = Date.now() + (roundDuration * 1000);
+        
+        await updateRoom(room.id, {
+            game_state: 'playing',
+            first_player_id: firstPlayer.id,
+            timer_end_time: timerEndTime
+        });
+        
+        await emitGameEvent(roomCode, 'round_start', {
+            firstPlayerName: firstPlayer.name,
+            firstPlayerId: firstPlayer.id,
+            timerEndTime,
+            duration: roundDuration
+        });
+    }
+    
+    return res.status(200).json({
+        success: true,
+        ready: readyCount,
+        total: totalCount,
+        allReady: readyCount >= totalCount
+    });
+}
+
+async function handleAccuse(req, res) {
+    const { roomCode, playerId, accusedId } = req.body;
+    
+    if (!roomCode || !playerId || !accusedId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    const room = await getRoomByCode(roomCode);
+    
+    if (!room || room.game_state !== 'playing') {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'La partida no está en curso' 
+        });
+    }
+    
+    const accuser = await getPlayerById(playerId);
+    const accused = await getPlayerById(accusedId);
+    
+    if (!accuser || !accused) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Jugador no encontrado' 
+        });
+    }
+    
+    await emitGameEvent(roomCode, 'player_accused', {
+        accuserName: accuser.name,
+        accusedName: accused.name,
+        accusedId: accusedId
+    });
+    
+    return res.status(200).json({ success: true });
+}
+
+async function handleResults(req, res) {
+    const { roomCode, playerId } = req.body;
+    
+    if (!roomCode || !playerId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    const room = await getRoomByCode(roomCode);
+    
+    if (!room) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Sala no encontrada' 
+        });
+    }
+    
+    if (room.host_id !== playerId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'Solo el anfitrión puede revelar resultados' 
+        });
+    }
+    
+    await updateRoom(room.id, { game_state: 'results' });
+    
+    const players = await getPlayersByRoom(room.id);
+    
+    const results = players.map(p => ({
+        id: p.id,
+        name: p.name,
+        role: p.role,
+        isHost: p.is_host
+    }));
+    
+    await emitGameEvent(roomCode, 'game_results', {
+        word: room.current_word,
+        category: room.current_category,
+        players: results
+    });
+    
+    return res.status(200).json({
+        success: true,
+        word: room.current_word,
+        category: room.current_category,
+        players: results
+    });
+}
+
+async function handleNewRound(req, res) {
+    const { roomCode, playerId } = req.body;
+    
+    if (!roomCode || !playerId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    const room = await getRoomByCode(roomCode);
+    
+    if (!room) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Sala no encontrada' 
+        });
+    }
+    
+    if (room.host_id !== playerId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'Solo el anfitrión puede iniciar una nueva ronda' 
+        });
+    }
+    
+    await updateRoom(room.id, {
+        game_state: 'lobby',
+        current_word: null,
+        current_hint: null,
+        current_category: null,
+        first_player_id: null,
+        timer_end_time: null
+    });
+    
+    await resetPlayersForNewRound(room.id);
+    await emitGameEvent(roomCode, 'back_to_lobby', {});
+    
+    return res.status(200).json({ success: true });
+}
+
+// Main handler con routing
+export default async function handler(req, res) {
+    setCorsHeaders(res);
+    
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+    
+    try {
+        const { action } = req.query;
+        
+        switch (action) {
+            case 'start':
+                return await handleStart(req, res);
+                
+            case 'ready':
+                return await handleReady(req, res);
+                
+            case 'accuse':
+                return await handleAccuse(req, res);
+                
+            case 'results':
+                return await handleResults(req, res);
+                
+            case 'new-round':
+                return await handleNewRound(req, res);
+                
+            default:
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Acción no válida. Usa: start, ready, accuse, results, new-round' 
+                });
+        }
+    } catch (error) {
+        console.error('Error in game handler:', error);
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Error interno del servidor' 
+        });
+    }
+}
