@@ -730,8 +730,13 @@
             if (!text) return;
             
             input.value = '';
-            addChatMessage({ playerName: state.playerName, playerId: state.playerId, text: text, timestamp: Date.now() });
-            await api('/game?action=chat', 'POST', { roomCode: state.roomCode, playerId: state.playerId, playerName: state.playerName, text: text });
+            const msgId = `${state.playerId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Añadir mensaje localmente con ID único
+            addChatMessage({ playerName: state.playerName, playerId: state.playerId, text: text, msgId: msgId });
+            
+            // Enviar al servidor con el mismo ID
+            await api('/game?action=chat', 'POST', { roomCode: state.roomCode, playerId: state.playerId, playerName: state.playerName, text: text, msgId: msgId });
         }
 
         function handleChatKeypress(e) {
@@ -739,7 +744,8 @@
         }
 
         function addChatMessage(msg) {
-            const msgKey = `${msg.playerId}-${msg.timestamp}`;
+            // Usar msgId si existe, sino generar uno basado en timestamp
+            const msgKey = msg.msgId || `${msg.playerId}-${msg.timestamp}`;
             if (state.chatMessages.includes(msgKey)) return;
             state.chatMessages.push(msgKey);
             

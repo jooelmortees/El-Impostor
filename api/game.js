@@ -295,7 +295,7 @@ async function handleNewRound(req, res) {
 }
 
 async function handleChat(req, res) {
-    const { roomCode, playerId, playerName, text } = req.body;
+    const { roomCode, playerId, playerName, text, msgId } = req.body;
     
     if (!roomCode || !playerId || !text) {
         return res.status(400).json({ 
@@ -304,12 +304,12 @@ async function handleChat(req, res) {
         });
     }
     
-    // Emit chat message event
+    // Emit chat message event con el mismo msgId del cliente
     await emitGameEvent(roomCode, 'chat_message', {
         playerId,
         playerName,
-        text: text.substring(0, 200), // Limit message length
-        timestamp: Date.now()
+        text: text.substring(0, 200),
+        msgId: msgId || `${playerId}-${Date.now()}`
     });
     
     return res.status(200).json({ success: true });
