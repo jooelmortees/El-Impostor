@@ -88,7 +88,8 @@ async function handleStart(req, res) {
     await emitGameEvent(roomCode, 'game_started', {
         roles: rolesData,
         totalPlayers: players.length,
-        category: categoryName
+        category: categoryName,
+        chatEnabled: settings.chatEnabled !== false
     });
     
     return res.status(200).json({

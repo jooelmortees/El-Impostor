@@ -213,6 +213,13 @@
                             <span class="text-sm text-gray-300">Pistas para impostor</span>
                             <div id="hint-toggle" class="toggle" onclick="toggleHint()"></div>
                         </div>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-sm text-gray-300">Chat en partida</span>
+                                <p class="text-[10px] text-gray-500">Para jugar en persona, desactivar</p>
+                            </div>
+                            <div id="chat-toggle" class="toggle active" onclick="toggleChat()"></div>
+                        </div>
                         <div>
                             <p class="text-sm text-gray-300 mb-3">Categorías</p>
                             <div id="categories-grid" class="grid grid-cols-2 gap-2"></div>
@@ -307,17 +314,8 @@
             </div>
         </div>
         
-        <!-- Overlay del primer jugador -->
-        <div id="first-player-overlay" class="absolute inset-0 bg-dark/95 backdrop-blur-xl z-50 flex items-center justify-center hidden">
-            <div class="text-center animate-slide-in">
-                <div class="text-6xl mb-4">🎯</div>
-                <p class="text-gray-400 text-sm mb-2">Empieza</p>
-                <p id="first-player-name" class="text-3xl font-bold text-accent-400"></p>
-            </div>
-        </div>
-        
         <!-- Modal de acusación -->
-        <div id="accuse-modal" class="absolute inset-0 bg-dark/95 backdrop-blur-xl z-50 flex items-center justify-center hidden">
+        <div id="accuse-modal" class="fixed inset-0 bg-dark/95 backdrop-blur-xl z-[100] flex items-center justify-center hidden">
             <div class="w-full max-w-sm mx-4">
                 <div class="glass rounded-2xl p-6">
                     <h3 class="text-lg font-bold text-center mb-4">⚖️ ¿A quién acusas?</h3>
@@ -331,7 +329,7 @@
         </div>
         
         <!-- Modal de votación -->
-        <div id="voting-modal" class="absolute inset-0 bg-dark/95 backdrop-blur-xl z-50 flex items-center justify-center hidden">
+        <div id="voting-modal" class="fixed inset-0 bg-dark/95 backdrop-blur-xl z-[100] flex items-center justify-center hidden">
             <div class="w-full max-w-sm mx-4">
                 <div class="glass rounded-2xl p-6">
                     <h3 class="text-lg font-bold text-center mb-2">🗳️ Votación en curso</h3>
@@ -368,7 +366,7 @@
         </div>
         
         <!-- Modal de resultado de votación -->
-        <div id="voting-result-modal" class="absolute inset-0 bg-dark/95 backdrop-blur-xl z-50 flex items-center justify-center hidden">
+        <div id="voting-result-modal" class="fixed inset-0 bg-dark/95 backdrop-blur-xl z-[100] flex items-center justify-center hidden">
             <div class="w-full max-w-sm mx-4 text-center animate-slide-in">
                 <div id="voting-result-content"></div>
                 <button onclick="closeVotingResult()" class="btn bg-white/10 mt-4 px-8 py-3 rounded-xl text-sm">
@@ -417,7 +415,7 @@
         const state = {
             roomCode: null, roomId: null, playerId: null, playerName: null, isHost: false,
             players: [], categories: [], selectedCategories: ['animales', 'profesiones', 'lugares'],
-            hintMode: false, myRole: null, myWord: null, myHint: null, myCategory: null,
+            hintMode: false, chatEnabled: true, myRole: null, myWord: null, myHint: null, myCategory: null,
             cardFlipped: false, isReady: false, turnOrder: [], currentTurnIndex: 0,
             timerInterval: null, heartbeatInterval: null, pollInterval: null, realtimeChannel: null,
             chatMessages: [], votingActive: false, hasVoted: false, eliminatedPlayers: []
@@ -663,12 +661,20 @@
             saveSettings();
         }
 
+        function toggleChat() {
+            state.chatEnabled = !state.chatEnabled;
+            document.getElementById('chat-toggle').classList.toggle('active', state.chatEnabled);
+            saveSettings();
+        }
+
         function applySettings(settings) {
             if (!settings) return;
             document.getElementById('impostor-slider').value = settings.impostorCount || 1;
             document.getElementById('impostor-count').textContent = settings.impostorCount || 1;
             state.hintMode = settings.hintMode || false;
+            state.chatEnabled = settings.chatEnabled !== false;
             document.getElementById('hint-toggle').classList.toggle('active', state.hintMode);
+            document.getElementById('chat-toggle').classList.toggle('active', state.chatEnabled);
             if (settings.selectedCategories) {
                 state.selectedCategories = settings.selectedCategories;
                 if (state.isHost) renderCategories();
@@ -683,6 +689,7 @@
                 settings: {
                     impostorCount: parseInt(document.getElementById('impostor-slider').value),
                     hintMode: state.hintMode,
+                    chatEnabled: state.chatEnabled,
                     selectedCategories: state.selectedCategories
                 }
             });
@@ -695,8 +702,18 @@
         }
 
         function handleGameStart(data) {
+            console.log('handleGameStart called', data, 'myPlayerId:', state.playerId);
+            
             const myData = data.roles[state.playerId];
-            if (!myData) return;
+            if (!myData) {
+                console.error('No role data for player:', state.playerId, 'Available roles:', Object.keys(data.roles));
+                toast('Error: No se encontró tu rol. Recargando...', 'error');
+                setTimeout(() => location.reload(), 2000);
+                return;
+            }
+            
+            // Guardar configuración de chat
+            state.chatEnabled = data.chatEnabled !== false;
             
             state.myRole = myData.role;
             state.myWord = myData.word;
@@ -769,6 +786,16 @@
             // Mostrar código de sala en lugar de rol
             document.getElementById('game-room-code').textContent = state.roomCode;
             
+            // Mostrar/ocultar chat según configuración
+            const chatContainer = document.querySelector('#screen-game .glass.rounded-xl.flex-1');
+            if (chatContainer) {
+                if (state.chatEnabled) {
+                    chatContainer.classList.remove('hidden');
+                } else {
+                    chatContainer.classList.add('hidden');
+                }
+            }
+            
             // Resetear estado de votación
             state.votingActive = false;
             state.hasVoted = false;
@@ -785,7 +812,11 @@
             
             state.chatMessages = [];
             document.getElementById('chat-messages').innerHTML = '';
-            addSystemMessage('¡La ronda ha comenzado! Discutan quién podría ser el impostor.');
+            if (state.chatEnabled) {
+                addSystemMessage('¡La ronda ha comenzado! Discutan quién podría ser el impostor.');
+            } else {
+                addSystemMessage('🎯 Modo presencial activado. ¡Hablen cara a cara!');
+            }
             
             startTimer(data.timerEndTime, data.duration);
             navigateTo('game');
@@ -924,13 +955,18 @@
             document.getElementById('voting-result-content').innerHTML = resultHtml;
             document.getElementById('voting-result-modal').classList.remove('hidden');
             
-            // Si el juego termina, ocultar el botón de continuar
+            // Si el juego termina, mostrar mensaje de victoria y auto-navegar a resultados
             if (data.gameOver) {
-                document.querySelector('#voting-result-modal button').classList.add('hidden');
+                const continueBtn = document.querySelector('#voting-result-modal button');
                 const winnerText = data.impostorsWin 
                     ? '<p class="text-impostor-400 font-bold mt-4 text-lg">🔴 ¡Los impostores ganan!</p>'
                     : '<p class="text-citizen-400 font-bold mt-4 text-lg">🔵 ¡Los ciudadanos ganan!</p>';
                 document.getElementById('voting-result-content').innerHTML += winnerText;
+                continueBtn.textContent = 'Ver Resultados';
+                continueBtn.onclick = () => {
+                    document.getElementById('voting-result-modal').classList.add('hidden');
+                    // Los resultados llegarán por evento game_results
+                };
             }
         }
 
