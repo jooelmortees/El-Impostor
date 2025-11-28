@@ -657,7 +657,7 @@
             const grid = document.getElementById('categories-grid');
             grid.innerHTML = state.categories.map(cat => `
                 <button onclick="toggleCategory('${cat.id}')" class="category-btn px-3 py-2 rounded-lg text-xs font-medium transition-all ${state.selectedCategories.includes(cat.id) ? 'bg-accent-500/30 border border-accent-500/50 text-accent-400' : 'bg-white/5 border border-white/10 text-gray-400'}">
-                    ${cat.emoji} ${cat.name}
+                    ${cat.name}
                 </button>
             `).join('');
         }
@@ -688,12 +688,20 @@
 
         function applySettings(settings) {
             if (!settings) return;
-            document.getElementById('impostor-slider').value = settings.impostorCount || 1;
-            document.getElementById('impostor-count').textContent = settings.impostorCount || 1;
+            const impostorSlider = document.getElementById('impostor-slider');
+            const impostorCount = document.getElementById('impostor-count');
+            const hintToggle = document.getElementById('hint-toggle');
+            const chatToggle = document.getElementById('chat-toggle');
+            
+            if (impostorSlider) impostorSlider.value = settings.impostorCount || 1;
+            if (impostorCount) impostorCount.textContent = settings.impostorCount || 1;
+            
             state.hintMode = settings.hintMode || false;
             state.chatEnabled = settings.chatEnabled !== false;
-            document.getElementById('hint-toggle').classList.toggle('active', state.hintMode);
-            document.getElementById('chat-toggle').classList.toggle('active', state.chatEnabled);
+            
+            if (hintToggle) hintToggle.classList.toggle('active', state.hintMode);
+            if (chatToggle) chatToggle.classList.toggle('active', state.chatEnabled);
+            
             if (settings.selectedCategories) {
                 state.selectedCategories = settings.selectedCategories;
                 if (state.isHost) renderCategories();
