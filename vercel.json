@@ -1,27 +1,15 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "api/**/*.js",
-            "use": "@vercel/node"
-        },
-        {
-            "src": "public/**",
-            "use": "@vercel/static"
-        }
+    "rewrites": [
+        { "source": "/api/:path*", "destination": "/api/:path*" }
     ],
-    "routes": [
+    "headers": [
         {
-            "src": "/api/(.*)",
-            "dest": "/api/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/public/$1"
+            "source": "/api/(.*)",
+            "headers": [
+                { "key": "Access-Control-Allow-Origin", "value": "*" },
+                { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+                { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+            ]
         }
-    ],
-    "env": {
-        "SUPABASE_URL": "https://peizekgikurxuljldixj.supabase.co",
-        "SUPABASE_SERVICE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXpla2dpa3VyeHVsamxkaXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMTUzOTgsImV4cCI6MjA3OTg5MTM5OH0.FFixNbhEZfqd4Ikwet12J07Yjh6iidN5c7OeUJzN5LU"
-    }
+    ]
 }
