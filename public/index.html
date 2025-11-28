@@ -3,795 +3,881 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎭 El Impostor</title>
+    <title>El Impostor - Juego de Deducción Social</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
+                    fontFamily: { sans: ['Space Grotesk', 'sans-serif'] },
                     colors: {
-                        dark: {
-                            900: '#0a0a0f',
-                            800: '#12121a',
-                            700: '#1a1a25',
-                            600: '#252532',
-                            500: '#32324a',
-                        },
-                        citizen: '#3b82f6',
-                        impostor: '#ef4444',
-                        ready: '#22c55e',
+                        surface: { 50: '#1a1a2e', 100: '#16162a', 200: '#0f0f1a', 300: '#0a0a12' },
+                        accent: { 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed' },
+                        citizen: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
+                        impostor: { 400: '#f87171', 500: '#ef4444', 600: '#dc2626' },
+                        success: '#10b981',
                     },
-                    animation: {
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'bounce-slow': 'bounce 2s infinite',
-                        'fade-in': 'fadeIn 0.5s ease-out',
-                        'slide-up': 'slideUp 0.4s ease-out',
-                        'scale-in': 'scaleIn 0.3s ease-out',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        },
-                        slideUp: {
-                            '0%': { opacity: '0', transform: 'translateY(20px)' },
-                            '100%': { opacity: '1', transform: 'translateY(0)' },
-                        },
-                        scaleIn: {
-                            '0%': { opacity: '0', transform: 'scale(0.9)' },
-                            '100%': { opacity: '1', transform: 'scale(1)' },
-                        },
-                    }
                 }
             }
         }
     </script>
     <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        body {
-            background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%);
-            min-height: 100vh;
-            min-height: 100dvh;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            transition: all 0.3s ease;
-        }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(99, 102, 241, 0.3); }
-        .btn-primary:active { transform: translateY(0); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-        }
-        .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
-        .card-reveal { perspective: 1000px; }
-        .card-reveal-inner { transition: transform 0.6s; transform-style: preserve-3d; }
-        .card-reveal.revealed .card-reveal-inner { transform: rotateY(180deg); }
-        .card-front, .card-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; }
+        body { background: radial-gradient(ellipse at top, #1a1a2e 0%, #0a0a12 100%); }
+        
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+        .glass-strong { background: rgba(255,255,255,0.06); backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        .btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-weight: 600; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: linear-gradient(135deg, #8b5cf6, #6366f1); box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3); }
+        .btn-primary:hover { box-shadow: 0 6px 30px rgba(139, 92, 246, 0.4); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-ghost { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+        .btn-danger { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
+        
+        .screen { display: none; opacity: 0; transform: translateY(10px); transition: opacity 0.3s ease, transform 0.3s ease; }
+        .screen.active { display: flex; opacity: 1; transform: translateY(0); }
+        .screen.fade-out { opacity: 0; transform: translateY(-10px); }
+        
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes pulse-ring { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes slide-in { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scale-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-slide-in { animation: slide-in 0.4s ease-out forwards; }
+        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+        .animate-scale-in { animation: scale-in 0.3s ease-out forwards; }
+        
+        .card-container { perspective: 1000px; }
+        .card-inner { transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+        .card-container.flipped .card-inner { transform: rotateY(180deg); }
+        .card-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
         .card-back { transform: rotateY(180deg); }
-        .timer-ring { transform: rotate(-90deg); }
-        .timer-ring circle { transition: stroke-dashoffset 1s linear; }
-        .shake { animation: shake 0.5s ease-in-out; }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-        .glow-citizen { box-shadow: 0 0 60px rgba(59, 130, 246, 0.3); }
-        .glow-impostor { box-shadow: 0 0 60px rgba(239, 68, 68, 0.3); }
-        input[type="range"] {
-            -webkit-appearance: none;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 24px;
-            height: 24px;
-            background: #6366f1;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        .category-chip { transition: all 0.2s ease; }
-        .category-chip.selected { background: rgba(99, 102, 241, 0.3); border-color: #6366f1; }
-        .player-item { animation: slideUp 0.3s ease-out; }
-        .screen { display: none; }
-        .screen.active { display: flex; }
-        .loading-spinner {
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top-color: #6366f1;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 0.8s linear infinite;
-        }
+        
+        input[type="text"] { transition: all 0.2s ease; }
+        input[type="text"]:focus { box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3); }
+        
+        input[type="range"] { -webkit-appearance: none; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: #8b5cf6; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 10px rgba(139, 92, 246, 0.4); }
+        
+        .toggle { position: relative; width: 48px; height: 26px; background: rgba(255,255,255,0.1); border-radius: 13px; cursor: pointer; transition: background 0.2s; }
+        .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.2s; }
+        .toggle.active { background: #8b5cf6; }
+        .toggle.active::after { transform: translateX(22px); }
+        
+        .chat-container { display: flex; flex-direction: column; height: 100%; }
+        .chat-messages { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+        .chat-messages::-webkit-scrollbar { width: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+        .chat-input-area { flex-shrink: 0; }
+        .message { animation: slide-in 0.3s ease-out; }
+        .message-own { background: rgba(139, 92, 246, 0.2); border-left: 3px solid #8b5cf6; }
+        .message-other { background: rgba(255,255,255,0.05); border-left: 3px solid rgba(255,255,255,0.2); }
+        .message-system { background: rgba(255,255,255,0.03); border-left: 3px solid rgba(255,255,255,0.1); text-align: center; font-style: italic; }
+        
+        .turn-active { background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.2)); border: 1px solid rgba(139, 92, 246, 0.4); }
+        .turn-indicator { width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse-ring 1.5s infinite; }
+        
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .timer-circle { transform: rotate(-90deg); }
+        .timer-circle circle { transition: stroke-dashoffset 1s linear; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        
+        .player-card { transition: all 0.2s ease; }
+        .player-card:hover { background: rgba(255,255,255,0.08); }
+        
+        .toast { animation: slide-in 0.3s ease-out, fade-out 0.3s ease-out 2.7s forwards; }
+        @keyframes fade-out { to { opacity: 0; transform: translateY(-10px); } }
     </style>
 </head>
-<body class="font-sans text-white overflow-x-hidden">
-    
-    <!-- PANTALLA DE INICIO -->
-    <div id="screen-home" class="screen active flex-col items-center justify-center min-h-screen p-6">
-        <div class="text-center animate-fade-in">
-            <div class="text-7xl mb-4">🎭</div>
-            <h1 class="text-4xl font-black mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">EL IMPOSTOR</h1>
-            <p class="text-gray-400 mb-10">Juego de deducción social</p>
-        </div>
-        <div class="w-full max-w-sm space-y-4 animate-slide-up">
-            <button onclick="showScreen('create')" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold flex items-center justify-center gap-3">
-                <span class="text-2xl">👑</span> Crear Partida
-            </button>
-            <button onclick="showScreen('join')" class="btn-secondary w-full py-5 rounded-2xl text-lg font-semibold flex items-center justify-center gap-3">
-                <span class="text-2xl">🚪</span> Unirse a Partida
-            </button>
-        </div>
-        <p class="text-gray-500 text-sm mt-10 text-center">Descubre quién es el impostor<br>antes de que sea tarde...</p>
-    </div>
-    
-    <!-- PANTALLA CREAR PARTIDA -->
-    <div id="screen-create" class="screen flex-col items-center justify-center min-h-screen p-6">
-        <button onclick="showScreen('home')" class="absolute top-6 left-6 text-gray-400 hover:text-white transition">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        </button>
-        <div class="text-center mb-8 animate-fade-in">
-            <div class="text-5xl mb-4">👑</div>
-            <h2 class="text-2xl font-bold">Crear Partida</h2>
-            <p class="text-gray-400 mt-2">Serás el anfitrión</p>
-        </div>
-        <div class="w-full max-w-sm animate-slide-up">
-            <div class="glass rounded-2xl p-6 mb-6">
-                <label class="block text-sm text-gray-400 mb-2">Tu nombre</label>
-                <input type="text" id="create-name" placeholder="Ej: Carlos" maxlength="15" class="w-full bg-dark-700 rounded-xl px-4 py-4 text-lg font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                <p id="create-error" class="text-red-400 text-sm mt-2 hidden"></p>
+<body class="font-sans text-white antialiased h-full">
+    <div id="app" class="h-full flex flex-col">
+        
+        <!-- SCREEN: HOME -->
+        <div id="screen-home" class="screen active flex-col items-center justify-center h-full p-6">
+            <div class="text-center mb-12">
+                <div class="text-8xl mb-6 animate-float">🎭</div>
+                <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-accent-400 to-pink-400 bg-clip-text text-transparent">El Impostor</h1>
+                <p class="text-gray-400 text-sm">Juego de deducción social</p>
             </div>
-            <button onclick="createRoom()" id="btn-create" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold flex items-center justify-center gap-2">
-                <span id="create-spinner" class="loading-spinner hidden"></span>
-                <span id="create-text">Crear Sala</span>
-            </button>
-        </div>
-    </div>
-    
-    <!-- PANTALLA UNIRSE -->
-    <div id="screen-join" class="screen flex-col items-center justify-center min-h-screen p-6">
-        <button onclick="showScreen('home')" class="absolute top-6 left-6 text-gray-400 hover:text-white transition">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        </button>
-        <div class="text-center mb-8 animate-fade-in">
-            <div class="text-5xl mb-4">🚪</div>
-            <h2 class="text-2xl font-bold">Unirse a Partida</h2>
-            <p class="text-gray-400 mt-2">Ingresa el código de la sala</p>
-        </div>
-        <div class="w-full max-w-sm animate-slide-up">
-            <div class="glass rounded-2xl p-6 mb-6 space-y-4">
-                <div>
-                    <label class="block text-sm text-gray-400 mb-2">Tu nombre</label>
-                    <input type="text" id="join-name" placeholder="Ej: María" maxlength="15" class="w-full bg-dark-700 rounded-xl px-4 py-4 text-lg font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-400 mb-2">Código de sala</label>
-                    <input type="text" id="join-code" placeholder="ABCD" maxlength="4" class="w-full bg-dark-700 rounded-xl px-4 py-4 text-2xl font-bold text-center tracking-[0.5em] uppercase placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                </div>
-                <p id="join-error" class="text-red-400 text-sm hidden"></p>
+            <div class="w-full max-w-xs space-y-3">
+                <button onclick="navigateTo('create')" class="btn btn-primary w-full py-4 rounded-xl flex items-center justify-center gap-3">
+                    <span class="text-xl">👑</span> Crear Partida
+                </button>
+                <button onclick="navigateTo('join')" class="btn btn-ghost w-full py-4 rounded-xl flex items-center justify-center gap-3">
+                    <span class="text-xl">🚪</span> Unirse
+                </button>
             </div>
-            <button onclick="joinRoom()" id="btn-join" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold flex items-center justify-center gap-2">
-                <span id="join-spinner" class="loading-spinner hidden"></span>
-                <span id="join-text">Unirse</span>
-            </button>
+            <p class="text-gray-500 text-xs mt-12 text-center max-w-xs">Descubre quién es el impostor antes de que sea demasiado tarde</p>
         </div>
-    </div>
-    
-    <!-- PANTALLA LOBBY -->
-    <div id="screen-lobby" class="screen flex-col min-h-screen">
-        <div class="glass p-4 flex items-center justify-between">
-            <div>
-                <p class="text-xs text-gray-400">CÓDIGO DE SALA</p>
-                <p id="lobby-code" class="text-2xl font-black tracking-widest text-purple-400">----</p>
-            </div>
-            <div class="text-right">
-                <p class="text-xs text-gray-400">JUGADORES</p>
-                <p id="lobby-count" class="text-2xl font-bold">0</p>
-            </div>
-        </div>
-        <div class="flex-1 p-4 overflow-y-auto">
-            <h3 class="text-sm font-semibold text-gray-400 mb-3">JUGADORES EN LA SALA</h3>
-            <div id="players-list" class="space-y-2"></div>
-        </div>
-        <div id="host-controls" class="hidden">
-            <div class="glass p-4 mx-4 mb-4 rounded-2xl space-y-5">
-                <h3 class="text-sm font-semibold text-gray-400">⚙️ CONFIGURACIÓN</h3>
-                <div>
-                    <div class="flex justify-between mb-2">
-                        <span class="text-sm">Impostores</span>
-                        <span id="impostor-count-display" class="font-bold text-impostor">1</span>
+
+        <!-- SCREEN: CREATE -->
+        <div id="screen-create" class="screen flex-col h-full">
+            <header class="glass-strong p-4 flex items-center gap-4">
+                <button onclick="navigateTo('home')" class="p-2 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <h1 class="font-semibold">Crear Partida</h1>
+            </header>
+            <div class="flex-1 flex flex-col items-center justify-center p-6">
+                <div class="text-6xl mb-6">👑</div>
+                <p class="text-gray-400 text-sm mb-8">Serás el anfitrión de la sala</p>
+                <div class="w-full max-w-xs space-y-4">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-2 block">Tu nombre</label>
+                        <input type="text" id="create-name" placeholder="Ej: Carlos" maxlength="12" class="w-full bg-surface-100 rounded-xl px-4 py-3 text-base outline-none border border-transparent focus:border-accent-500">
                     </div>
-                    <input type="range" id="impostor-slider" min="1" max="3" value="1" class="w-full" onchange="updateSettings()">
+                    <p id="create-error" class="text-impostor-400 text-xs hidden"></p>
+                    <button onclick="createRoom()" class="btn btn-primary w-full py-4 rounded-xl flex items-center justify-center gap-2">
+                        <span id="create-spinner" class="spinner hidden"></span>
+                        <span id="create-text">Crear Sala</span>
+                    </button>
                 </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm">Modo Pista para Impostores</span>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="hint-mode" class="sr-only peer" onchange="updateSettings()">
-                        <div class="w-14 h-8 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+            </div>
+        </div>
+
+        <!-- SCREEN: JOIN -->
+        <div id="screen-join" class="screen flex-col h-full">
+            <header class="glass-strong p-4 flex items-center gap-4">
+                <button onclick="navigateTo('home')" class="p-2 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <h1 class="font-semibold">Unirse a Partida</h1>
+            </header>
+            <div class="flex-1 flex flex-col items-center justify-center p-6">
+                <div class="text-6xl mb-6">🚪</div>
+                <p class="text-gray-400 text-sm mb-8">Ingresa el código de la sala</p>
+                <div class="w-full max-w-xs space-y-4">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-2 block">Tu nombre</label>
+                        <input type="text" id="join-name" placeholder="Ej: María" maxlength="12" class="w-full bg-surface-100 rounded-xl px-4 py-3 text-base outline-none border border-transparent focus:border-accent-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-2 block">Código de sala</label>
+                        <input type="text" id="join-code" placeholder="ABCD" maxlength="4" class="w-full bg-surface-100 rounded-xl px-4 py-4 text-2xl font-bold text-center tracking-[0.3em] uppercase outline-none border border-transparent focus:border-accent-500">
+                    </div>
+                    <p id="join-error" class="text-impostor-400 text-xs hidden"></p>
+                    <button onclick="joinRoom()" class="btn btn-primary w-full py-4 rounded-xl flex items-center justify-center gap-2">
+                        <span id="join-spinner" class="spinner hidden"></span>
+                        <span id="join-text">Unirse</span>
+                    </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: LOBBY -->
+        <div id="screen-lobby" class="screen flex-col h-full">
+            <header class="glass-strong p-4 flex items-center justify-between">
                 <div>
-                    <span class="text-sm block mb-3">Categorías</span>
-                    <div id="categories-container" class="flex flex-wrap gap-2"></div>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider">Código</p>
+                    <p id="lobby-code" class="text-xl font-bold text-accent-400 tracking-widest">----</p>
                 </div>
-            </div>
-        </div>
-        <div class="p-4">
-            <button id="btn-start-game" onclick="startGame()" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hidden" disabled>Iniciar Partida</button>
-            <div id="waiting-host" class="glass rounded-2xl py-5 text-center text-gray-400 hidden">
-                <div class="animate-pulse">⏳ Esperando al anfitrión...</div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- PANTALLA REVELACIÓN -->
-    <div id="screen-reveal" class="screen flex-col items-center justify-center min-h-screen p-6">
-        <div id="reveal-card" class="card-reveal w-full max-w-sm aspect-[3/4] cursor-pointer" onclick="revealCard()">
-            <div class="card-reveal-inner relative w-full h-full">
-                <div class="card-front absolute inset-0 glass rounded-3xl flex flex-col items-center justify-center">
-                    <div class="text-6xl mb-6 animate-bounce-slow">🎴</div>
-                    <p class="text-2xl font-bold text-center">TOCA PARA<br>REVELAR</p>
-                    <p class="text-gray-400 mt-4 text-sm">Tu rol secreto te espera</p>
-                </div>
-                <div id="card-back-content" class="card-back absolute inset-0 rounded-3xl flex flex-col items-center justify-center p-8"></div>
-            </div>
-        </div>
-        <button id="btn-understood" onclick="playerReady()" class="btn-primary w-full max-w-sm py-5 rounded-2xl text-lg font-bold mt-6 hidden">¡Entendido!</button>
-        <div id="waiting-others" class="glass rounded-2xl py-5 px-8 text-center mt-6 hidden">
-            <p class="text-gray-300 mb-2">Esperando a los demás...</p>
-            <p class="text-2xl font-bold"><span id="ready-count">0</span>/<span id="total-count">0</span> listos</p>
-        </div>
-    </div>
-    
-    <!-- PANTALLA JUEGO -->
-    <div id="screen-game" class="screen flex-col min-h-screen">
-        <div id="first-player-announcement" class="fixed inset-0 bg-dark-900/95 flex items-center justify-center z-50 hidden">
-            <div class="text-center animate-scale-in p-8">
-                <div class="text-6xl mb-6">🎯</div>
-                <p class="text-xl text-gray-400 mb-2">¡EMPIEZA PREGUNTANDO!</p>
-                <p id="first-player-name" class="text-4xl font-black bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent"></p>
-            </div>
-        </div>
-        <div class="glass p-4 flex items-center justify-between">
-            <div id="game-role-badge" class="px-4 py-2 rounded-full text-sm font-bold"></div>
-            <div class="flex items-center gap-3">
                 <div class="text-right">
-                    <p class="text-xs text-gray-400">TIEMPO</p>
-                    <p id="game-timer" class="text-2xl font-bold font-mono">5:00</p>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider">Jugadores</p>
+                    <p id="lobby-count" class="text-xl font-bold">0</p>
                 </div>
-                <svg class="timer-ring w-12 h-12" viewBox="0 0 36 36">
-                    <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
-                    <circle id="timer-circle" cx="18" cy="18" r="16" fill="none" stroke="#6366f1" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="0" stroke-linecap="round"/>
-                </svg>
+            </header>
+            
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="mb-6">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">En la sala</h3>
+                    <div id="players-list" class="space-y-2"></div>
+                </div>
+                
+                <div id="host-controls" class="hidden">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Configuración</h3>
+                    <div class="glass rounded-xl p-4 space-y-5">
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-300">Impostores</span>
+                                <span id="impostor-count" class="font-bold text-impostor-400">1</span>
+                            </div>
+                            <input type="range" id="impostor-slider" min="1" max="3" value="1" class="w-full" oninput="updateImpostorDisplay()" onchange="saveSettings()">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-300">Pistas para impostor</span>
+                            <div id="hint-toggle" class="toggle" onclick="toggleHint()"></div>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-300 mb-3">Categorías</p>
+                            <div id="categories-grid" class="grid grid-cols-2 gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 space-y-2">
+                <button id="btn-start" onclick="startGame()" class="btn btn-primary w-full py-4 rounded-xl hidden" disabled>
+                    Iniciar Partida
+                </button>
+                <div id="waiting-msg" class="glass rounded-xl py-4 text-center text-gray-400 text-sm hidden">
+                    <span class="inline-block animate-pulse">⏳</span> Esperando al anfitrión...
+                </div>
             </div>
         </div>
-        <div class="p-4">
-            <div id="game-word-container" class="glass rounded-2xl p-6 text-center mb-4">
-                <p class="text-xs text-gray-400 mb-2" id="game-category-label">CATEGORÍA</p>
-                <p id="game-word-display" class="text-3xl font-black"></p>
+
+        <!-- SCREEN: REVEAL -->
+        <div id="screen-reveal" class="screen flex-col items-center justify-center h-full p-6">
+            <div id="reveal-card" class="card-container w-full max-w-xs aspect-[3/4] cursor-pointer" onclick="flipCard()">
+                <div class="card-inner relative w-full h-full">
+                    <div class="card-face absolute inset-0 glass-strong rounded-2xl flex flex-col items-center justify-center p-6">
+                        <div class="text-6xl mb-4 animate-float">🎴</div>
+                        <p class="text-xl font-bold text-center">Toca para revelar</p>
+                        <p class="text-gray-400 text-sm mt-2">Tu rol secreto</p>
+                    </div>
+                    <div id="card-back" class="card-face card-back absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-6"></div>
+                </div>
             </div>
-            <div id="game-hint-container" class="glass rounded-2xl p-4 text-center mb-4 hidden">
-                <p class="text-xs text-gray-400 mb-1">💡 PISTA</p>
-                <p id="game-hint-display" class="text-lg font-medium text-yellow-400"></p>
+            <button id="btn-ready" onclick="markReady()" class="btn btn-primary w-full max-w-xs py-4 rounded-xl mt-6 hidden">
+                ¡Entendido!
+            </button>
+            <div id="ready-status" class="glass rounded-xl py-4 px-6 mt-6 hidden">
+                <p class="text-gray-300 text-sm">Esperando a los demás...</p>
+                <p class="text-xl font-bold mt-1"><span id="ready-count">0</span>/<span id="ready-total">0</span></p>
             </div>
         </div>
-        <div class="flex-1 p-4 overflow-y-auto">
-            <h3 class="text-sm font-semibold text-gray-400 mb-3">JUGADORES</h3>
-            <div id="game-players-list" class="space-y-2"></div>
+
+        <!-- SCREEN: GAME (with chat) -->
+        <div id="screen-game" class="screen flex-col h-full">
+            <div id="first-player-overlay" class="fixed inset-0 bg-surface-300/95 flex items-center justify-center z-50 hidden">
+                <div class="text-center animate-scale-in">
+                    <div class="text-6xl mb-4">🎯</div>
+                    <p class="text-gray-400 text-sm mb-2">EMPIEZA DESCRIBIENDO</p>
+                    <p id="first-player-name" class="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent"></p>
+                </div>
+            </div>
+            
+            <header class="glass-strong p-3 flex items-center justify-between shrink-0">
+                <div id="game-role-badge" class="px-3 py-1.5 rounded-full text-xs font-bold"></div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <p id="game-timer" class="text-lg font-bold font-mono">5:00</p>
+                    </div>
+                    <svg class="timer-circle w-10 h-10" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2.5"/>
+                        <circle id="timer-progress" cx="18" cy="18" r="16" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-dasharray="100" stroke-dashoffset="0" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </header>
+            
+            <div class="flex-1 flex flex-col min-h-0">
+                <div class="p-3 shrink-0">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Orden de turnos</p>
+                    <div id="turn-order" class="flex gap-2 overflow-x-auto pb-2"></div>
+                </div>
+                
+                <div class="flex-1 flex flex-col min-h-0 px-3 pb-3">
+                    <div class="glass rounded-xl flex-1 flex flex-col min-h-0 overflow-hidden">
+                        <div id="chat-messages" class="chat-messages flex-1 p-3 space-y-2 overflow-y-auto"></div>
+                        <div class="chat-input-area p-3 border-t border-white/5">
+                            <div class="flex gap-2">
+                                <input type="text" id="chat-input" placeholder="Escribe un mensaje..." maxlength="200" class="flex-1 bg-surface-100 rounded-lg px-3 py-2 text-sm outline-none border border-transparent focus:border-accent-500" onkeypress="handleChatKeypress(event)">
+                                <button onclick="sendMessage()" class="btn btn-primary px-4 py-2 rounded-lg text-sm">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="game-host-controls" class="p-3 hidden shrink-0">
+                <button onclick="revealResults()" class="btn btn-danger w-full py-3 rounded-xl text-sm">
+                    🔍 Revelar Impostores
+                </button>
+            </div>
         </div>
-        <div id="game-host-controls" class="p-4 hidden">
-            <button onclick="revealResults()" class="btn-secondary w-full py-4 rounded-2xl font-bold text-red-400 border-red-400/30">🔍 Revelar Impostores</button>
+
+        <!-- SCREEN: RESULTS -->
+        <div id="screen-results" class="screen flex-col h-full">
+            <header class="glass-strong p-4 text-center">
+                <div class="text-4xl mb-2">🎭</div>
+                <h1 class="font-bold text-lg">Resultados</h1>
+            </header>
+            
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="glass rounded-xl p-4 mb-4 text-center">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">La palabra era</p>
+                    <p id="result-word" class="text-2xl font-bold text-citizen-400"></p>
+                    <p id="result-category" class="text-xs text-gray-400 mt-1"></p>
+                </div>
+                
+                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Roles revelados</h3>
+                <div id="results-list" class="space-y-2"></div>
+            </div>
+            
+            <div class="p-4">
+                <button id="btn-new-round" onclick="newRound()" class="btn btn-primary w-full py-4 rounded-xl hidden">
+                    🔄 Nueva Ronda
+                </button>
+                <div id="waiting-new-round" class="glass rounded-xl py-4 text-center text-gray-400 text-sm hidden">
+                    <span class="inline-block animate-pulse">⏳</span> Esperando nueva ronda...
+                </div>
+            </div>
         </div>
+
     </div>
     
-    <!-- PANTALLA RESULTADOS -->
-    <div id="screen-results" class="screen flex-col min-h-screen p-6">
-        <div class="text-center mb-6 animate-fade-in">
-            <div class="text-6xl mb-4">🎭</div>
-            <h2 class="text-2xl font-bold">Resultados</h2>
-        </div>
-        <div class="glass rounded-2xl p-6 mb-6 text-center animate-slide-up">
-            <p class="text-xs text-gray-400 mb-2" id="result-category">CATEGORÍA</p>
-            <p class="text-3xl font-black text-citizen" id="result-word">PALABRA</p>
-        </div>
-        <div class="flex-1 overflow-y-auto mb-4">
-            <h3 class="text-sm font-semibold text-gray-400 mb-3">ROLES REVELADOS</h3>
-            <div id="results-list" class="space-y-2"></div>
-        </div>
-        <button id="btn-new-round" onclick="newRound()" class="btn-primary w-full py-5 rounded-2xl text-lg font-bold hidden">🔄 Nueva Ronda</button>
-        <div id="waiting-new-round" class="glass rounded-2xl py-5 text-center text-gray-400 hidden">
-            <div class="animate-pulse">⏳ Esperando nueva ronda...</div>
-        </div>
-    </div>
-    
-    <!-- TOAST -->
-    <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 space-y-2"></div>
+    <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 space-y-2 pointer-events-none"></div>
     
     <script>
-        // CONFIGURACIÓN DE SUPABASE
         const SUPABASE_URL = 'https://peizekgikurxuljldixj.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXpla2dpa3VyeHVsamxkaXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMTUzOTgsImV4cCI6MjA3OTg5MTM5OH0.FFixNbhEZfqd4Ikwet12J07Yjh6iidN5c7OeUJzN5LU';
-        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+
         const state = {
-            roomCode: null, roomId: null, playerId: null, isHost: false, playerName: null,
-            myRole: null, myWord: null, myHint: null, myCategory: null,
-            categories: [], selectedCategories: ['animales', 'profesiones', 'lugares'],
-            players: [], timerInterval: null, cardRevealed: false, isReady: false,
-            heartbeatInterval: null, realtimeChannel: null, pollInterval: null
+            roomCode: null, roomId: null, playerId: null, playerName: null, isHost: false,
+            players: [], categories: [], selectedCategories: ['animales', 'profesiones', 'lugares'],
+            hintMode: false, myRole: null, myWord: null, myHint: null, myCategory: null,
+            cardFlipped: false, isReady: false, turnOrder: [], currentTurnIndex: 0,
+            timerInterval: null, heartbeatInterval: null, pollInterval: null, realtimeChannel: null,
+            chatMessages: []
         };
+
+        let currentScreen = 'home';
         
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('join-code').addEventListener('input', (e) => {
-                e.target.value = e.target.value.toUpperCase();
-            });
-            window.addEventListener('beforeunload', leaveRoom);
-        });
-        
-        async function apiCall(endpoint, method = 'GET', body = null) {
+        function navigateTo(screenId) {
+            const oldScreen = document.getElementById(`screen-${currentScreen}`);
+            const newScreen = document.getElementById(`screen-${screenId}`);
+            if (oldScreen) {
+                oldScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    oldScreen.classList.remove('active', 'fade-out');
+                    newScreen.classList.add('active');
+                    currentScreen = screenId;
+                }, 150);
+            } else {
+                newScreen.classList.add('active');
+                currentScreen = screenId;
+            }
+        }
+
+        async function api(endpoint, method = 'GET', body = null) {
             const options = { method, headers: { 'Content-Type': 'application/json' } };
             if (body) options.body = JSON.stringify(body);
-            const response = await fetch(`/api${endpoint}`, options);
-            return response.json();
+            try {
+                const res = await fetch(`/api${endpoint}`, options);
+                return await res.json();
+            } catch (e) {
+                console.error('API Error:', e);
+                return { success: false, error: 'Error de conexión' };
+            }
         }
-        
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(`screen-${screenId}`).classList.add('active');
-        }
-        
+
         async function createRoom() {
-            const nameInput = document.getElementById('create-name');
+            const name = document.getElementById('create-name').value.trim();
             const errorEl = document.getElementById('create-error');
             const spinner = document.getElementById('create-spinner');
             const text = document.getElementById('create-text');
-            const name = nameInput.value.trim();
             
-            if (name.length < 2) {
-                showError(errorEl, 'El nombre debe tener al menos 2 caracteres');
-                nameInput.classList.add('shake');
-                setTimeout(() => nameInput.classList.remove('shake'), 500);
-                return;
-            }
+            if (name.length < 2) { showError(errorEl, 'Mínimo 2 caracteres'); return; }
             
             hideError(errorEl);
             spinner.classList.remove('hidden');
             text.textContent = 'Creando...';
             
-            try {
-                const response = await apiCall('/rooms?action=create', 'POST', { playerName: name });
-                if (response.success) {
-                    state.roomCode = response.roomCode;
-                    state.roomId = response.roomId;
-                    state.playerId = response.playerId;
-                    state.isHost = true;
-                    state.playerName = name;
-                    state.categories = response.categories;
-                    enterLobby();
-                } else {
-                    showError(errorEl, response.error);
-                }
-            } catch (error) {
-                showError(errorEl, 'Error de conexión');
-            } finally {
-                spinner.classList.add('hidden');
-                text.textContent = 'Crear Sala';
+            const res = await api('/rooms?action=create', 'POST', { playerName: name });
+            
+            spinner.classList.add('hidden');
+            text.textContent = 'Crear Sala';
+            
+            if (res.success) {
+                state.roomCode = res.roomCode;
+                state.roomId = res.roomId;
+                state.playerId = res.playerId;
+                state.playerName = name;
+                state.isHost = true;
+                state.categories = res.categories || [];
+                enterLobby();
+            } else {
+                showError(errorEl, res.error);
             }
         }
-        
+
         async function joinRoom() {
-            const nameInput = document.getElementById('join-name');
-            const codeInput = document.getElementById('join-code');
+            const name = document.getElementById('join-name').value.trim();
+            const code = document.getElementById('join-code').value.trim().toUpperCase();
             const errorEl = document.getElementById('join-error');
             const spinner = document.getElementById('join-spinner');
             const text = document.getElementById('join-text');
-            const name = nameInput.value.trim();
-            const code = codeInput.value.trim().toUpperCase();
             
-            if (name.length < 2) {
-                showError(errorEl, 'El nombre debe tener al menos 2 caracteres');
-                nameInput.classList.add('shake');
-                setTimeout(() => nameInput.classList.remove('shake'), 500);
-                return;
-            }
-            
-            if (code.length !== 4) {
-                showError(errorEl, 'El código debe tener 4 letras');
-                codeInput.classList.add('shake');
-                setTimeout(() => codeInput.classList.remove('shake'), 500);
-                return;
-            }
+            if (name.length < 2) { showError(errorEl, 'Mínimo 2 caracteres'); return; }
+            if (code.length !== 4) { showError(errorEl, 'Código de 4 letras'); return; }
             
             hideError(errorEl);
             spinner.classList.remove('hidden');
             text.textContent = 'Uniendo...';
             
-            try {
-                const response = await apiCall('/rooms?action=join', 'POST', { playerName: name, roomCode: code });
-                if (response.success) {
-                    state.roomCode = response.roomCode;
-                    state.roomId = response.roomId;
-                    state.playerId = response.playerId;
-                    state.isHost = false;
-                    state.playerName = name;
-                    state.categories = response.categories;
-                    enterLobby();
-                } else {
-                    showError(errorEl, response.error);
-                }
-            } catch (error) {
-                showError(errorEl, 'Error de conexión');
-            } finally {
-                spinner.classList.add('hidden');
-                text.textContent = 'Unirse';
+            const res = await api('/rooms?action=join', 'POST', { playerName: name, roomCode: code });
+            
+            spinner.classList.add('hidden');
+            text.textContent = 'Unirse';
+            
+            if (res.success) {
+                state.roomCode = res.roomCode;
+                state.roomId = res.roomId;
+                state.playerId = res.playerId;
+                state.playerName = name;
+                state.isHost = false;
+                state.categories = res.categories || [];
+                enterLobby();
+            } else {
+                showError(errorEl, res.error);
             }
         }
-        
+
         function enterLobby() {
-            showScreen('lobby');
+            navigateTo('lobby');
             document.getElementById('lobby-code').textContent = state.roomCode;
             
             if (state.isHost) {
                 document.getElementById('host-controls').classList.remove('hidden');
-                document.getElementById('btn-start-game').classList.remove('hidden');
-                document.getElementById('waiting-host').classList.add('hidden');
+                document.getElementById('btn-start').classList.remove('hidden');
+                document.getElementById('waiting-msg').classList.add('hidden');
                 renderCategories();
             } else {
                 document.getElementById('host-controls').classList.add('hidden');
-                document.getElementById('btn-start-game').classList.add('hidden');
-                document.getElementById('waiting-host').classList.remove('hidden');
+                document.getElementById('btn-start').classList.add('hidden');
+                document.getElementById('waiting-msg').classList.remove('hidden');
             }
             
-            subscribeToRoomEvents();
-            startPlayersPolling();
+            setupRealtime();
+            startPolling();
             startHeartbeat();
             fetchPlayers();
         }
-        
-        function subscribeToRoomEvents() {
+
+        function setupRealtime() {
             if (state.realtimeChannel) supabase.removeChannel(state.realtimeChannel);
             
             state.realtimeChannel = supabase
                 .channel(`room-${state.roomCode}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_events', filter: `room_code=eq.${state.roomCode}` }, (payload) => handleGameEvent(payload.new))
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_events', filter: `room_code=eq.${state.roomCode}` }, payload => handleEvent(payload.new))
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${state.roomId}` }, () => fetchPlayers())
                 .subscribe();
         }
-        
-        function handleGameEvent(event) {
+
+        function handleEvent(event) {
             const { event_type, payload } = event;
-            switch (event_type) {
-                case 'settings_update': handleSettingsUpdate(payload); break;
-                case 'game_started': handleGameStarted(payload); break;
-                case 'ready_progress': handleReadyProgress(payload); break;
+            switch(event_type) {
+                case 'settings_update': applySettings(payload); break;
+                case 'game_started': handleGameStart(payload); break;
+                case 'ready_progress': updateReadyProgress(payload); break;
                 case 'round_start': handleRoundStart(payload); break;
-                case 'player_accused': showToast(`${payload.accuserName} acusa a ${payload.accusedName}`, 'warning'); break;
-                case 'game_results': showResultsScreen(payload); break;
-                case 'back_to_lobby': handleBackToLobby(); break;
-                case 'player_disconnected': showToast(`${payload.playerName} se ha desconectado`, 'warning'); fetchPlayers(); break;
+                case 'chat_message': addChatMessage(payload); break;
+                case 'game_results': showResults(payload); break;
+                case 'back_to_lobby': backToLobby(); break;
+                case 'player_disconnected': toast(`${payload.playerName} se desconectó`, 'warning'); fetchPlayers(); break;
                 case 'host_changed':
                     if (payload.newHostId === state.playerId) {
                         state.isHost = true;
-                        showToast('¡Ahora eres el anfitrión!', 'success');
-                        const currentScreen = document.querySelector('.screen.active')?.id;
-                        if (currentScreen === 'screen-lobby') {
+                        toast('¡Ahora eres el anfitrión!', 'success');
+                        if (currentScreen === 'lobby') {
                             document.getElementById('host-controls').classList.remove('hidden');
-                            document.getElementById('btn-start-game').classList.remove('hidden');
-                            document.getElementById('waiting-host').classList.add('hidden');
+                            document.getElementById('btn-start').classList.remove('hidden');
+                            document.getElementById('waiting-msg').classList.add('hidden');
                             renderCategories();
                         }
                     }
-                    showToast(`${payload.newHostName} es el nuevo anfitrión`, 'info');
                     break;
             }
         }
-        
-        function startPlayersPolling() {
+
+        function startPolling() {
             if (state.pollInterval) clearInterval(state.pollInterval);
             state.pollInterval = setInterval(fetchPlayers, 3000);
         }
-        
-        function stopPlayersPolling() {
+
+        function stopPolling() {
             if (state.pollInterval) { clearInterval(state.pollInterval); state.pollInterval = null; }
         }
-        
+
         async function fetchPlayers() {
-            try {
-                const response = await apiCall(`/rooms?action=players&roomCode=${state.roomCode}`);
-                if (response.success) {
-                    renderPlayers(response.players);
-                    if (response.settings) handleSettingsUpdate(response.settings);
-                }
-            } catch (error) { console.error('Error fetching players:', error); }
+            const res = await api(`/rooms?action=players&roomCode=${state.roomCode}`);
+            if (res.success) {
+                state.players = res.players;
+                renderPlayers(res.players);
+                if (res.settings) applySettings(res.settings);
+            }
         }
-        
+
         function startHeartbeat() {
             if (state.heartbeatInterval) clearInterval(state.heartbeatInterval);
-            state.heartbeatInterval = setInterval(async () => {
-                try { await apiCall('/rooms?action=heartbeat', 'POST', { playerId: state.playerId }); } catch (error) {}
+            state.heartbeatInterval = setInterval(() => {
+                api('/rooms?action=heartbeat', 'POST', { playerId: state.playerId });
             }, 10000);
         }
-        
+
         function stopHeartbeat() {
             if (state.heartbeatInterval) { clearInterval(state.heartbeatInterval); state.heartbeatInterval = null; }
         }
-        
-        async function leaveRoom() {
-            if (!state.roomCode || !state.playerId) return;
-            stopHeartbeat();
-            stopPlayersPolling();
-            if (state.realtimeChannel) supabase.removeChannel(state.realtimeChannel);
-            try { await apiCall('/rooms?action=leave', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); } catch (error) {}
+
+        function renderPlayers(players) {
+            const container = document.getElementById('players-list');
+            document.getElementById('lobby-count').textContent = players.length;
+            
+            container.innerHTML = players.map(p => `
+                <div class="player-card glass rounded-xl p-3 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-pink-500 flex items-center justify-center font-bold text-sm">
+                        ${p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium truncate">${escapeHtml(p.name)}</p>
+                        ${p.isHost ? '<p class="text-[10px] text-accent-400">👑 Anfitrión</p>' : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            updateStartButton(players.length);
         }
-        
-        function renderCategories() {
-            const container = document.getElementById('categories-container');
-            container.innerHTML = '';
-            state.categories.forEach(cat => {
-                const isSelected = state.selectedCategories.includes(cat.id);
-                const chip = document.createElement('button');
-                chip.className = `category-chip px-4 py-2 rounded-full text-sm font-medium border transition ${isSelected ? 'selected bg-purple-500/20 border-purple-500 text-purple-300' : 'border-gray-600 text-gray-400 hover:border-gray-500'}`;
-                chip.textContent = cat.name;
-                chip.onclick = () => toggleCategory(cat.id);
-                container.appendChild(chip);
-            });
-        }
-        
-        function toggleCategory(categoryId) {
-            const index = state.selectedCategories.indexOf(categoryId);
-            if (index > -1) { if (state.selectedCategories.length > 1) state.selectedCategories.splice(index, 1); }
-            else state.selectedCategories.push(categoryId);
-            renderCategories();
-            updateSettings();
-        }
-        
-        async function updateSettings() {
+
+        function updateStartButton(count) {
             if (!state.isHost) return;
-            const impostorCount = parseInt(document.getElementById('impostor-slider').value);
-            const hintMode = document.getElementById('hint-mode').checked;
-            document.getElementById('impostor-count-display').textContent = impostorCount;
-            try {
-                await apiCall('/rooms?action=settings', 'POST', { roomCode: state.roomCode, playerId: state.playerId, settings: { impostorCount, hintMode, selectedCategories: state.selectedCategories } });
-            } catch (error) { showToast('Error al guardar configuración', 'error'); }
+            const btn = document.getElementById('btn-start');
+            if (count >= 3) {
+                btn.disabled = false;
+                btn.textContent = `Iniciar Partida (${count} jugadores)`;
+            } else {
+                btn.disabled = true;
+                btn.textContent = `Faltan ${3 - count} jugador(es)`;
+            }
         }
-        
-        function handleSettingsUpdate(settings) {
+
+        function renderCategories() {
+            const grid = document.getElementById('categories-grid');
+            grid.innerHTML = state.categories.map(cat => `
+                <button onclick="toggleCategory('${cat.id}')" class="category-btn px-3 py-2 rounded-lg text-xs font-medium transition-all ${state.selectedCategories.includes(cat.id) ? 'bg-accent-500/30 border border-accent-500/50 text-accent-400' : 'bg-white/5 border border-white/10 text-gray-400'}">
+                    ${cat.emoji} ${cat.name}
+                </button>
+            `).join('');
+        }
+
+        function toggleCategory(id) {
+            const idx = state.selectedCategories.indexOf(id);
+            if (idx > -1) { if (state.selectedCategories.length > 1) state.selectedCategories.splice(idx, 1); }
+            else state.selectedCategories.push(id);
+            renderCategories();
+            saveSettings();
+        }
+
+        function updateImpostorDisplay() {
+            document.getElementById('impostor-count').textContent = document.getElementById('impostor-slider').value;
+        }
+
+        function toggleHint() {
+            state.hintMode = !state.hintMode;
+            document.getElementById('hint-toggle').classList.toggle('active', state.hintMode);
+            saveSettings();
+        }
+
+        function applySettings(settings) {
             if (!settings) return;
             document.getElementById('impostor-slider').value = settings.impostorCount || 1;
-            document.getElementById('impostor-count-display').textContent = settings.impostorCount || 1;
-            document.getElementById('hint-mode').checked = settings.hintMode || false;
-            if (settings.selectedCategories) state.selectedCategories = settings.selectedCategories;
-            if (state.isHost) renderCategories();
+            document.getElementById('impostor-count').textContent = settings.impostorCount || 1;
+            state.hintMode = settings.hintMode || false;
+            document.getElementById('hint-toggle').classList.toggle('active', state.hintMode);
+            if (settings.selectedCategories) {
+                state.selectedCategories = settings.selectedCategories;
+                if (state.isHost) renderCategories();
+            }
         }
-        
-        function renderPlayers(players) {
-            state.players = players;
-            const container = document.getElementById('players-list');
-            container.innerHTML = '';
-            document.getElementById('lobby-count').textContent = players.length;
-            players.forEach(player => {
-                const item = document.createElement('div');
-                item.className = 'player-item glass rounded-xl p-4 flex items-center justify-between';
-                item.innerHTML = `<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold">${player.name.charAt(0).toUpperCase()}</div><div><p class="font-semibold">${escapeHtml(player.name)}</p>${player.isHost ? '<p class="text-xs text-purple-400">👑 Anfitrión</p>' : ''}</div></div><div class="text-2xl">${player.isHost ? '👑' : '🎮'}</div>`;
-                container.appendChild(item);
-            });
-            updateStartButton();
-        }
-        
-        function updateStartButton() {
+
+        async function saveSettings() {
             if (!state.isHost) return;
-            const btn = document.getElementById('btn-start-game');
-            const playerCount = state.players.length;
-            if (playerCount >= 3) { btn.disabled = false; btn.textContent = `Iniciar Partida (${playerCount} jugadores)`; }
-            else { btn.disabled = true; btn.textContent = `Necesitas ${3 - playerCount} jugador(es) más`; }
+            await api('/rooms?action=settings', 'POST', {
+                roomCode: state.roomCode,
+                playerId: state.playerId,
+                settings: {
+                    impostorCount: parseInt(document.getElementById('impostor-slider').value),
+                    hintMode: state.hintMode,
+                    selectedCategories: state.selectedCategories
+                }
+            });
         }
-        
+
         async function startGame() {
             if (!state.isHost) return;
-            try {
-                const response = await apiCall('/game?action=start', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
-                if (!response.success) showToast(response.error, 'error');
-            } catch (error) { showToast('Error al iniciar partida', 'error'); }
+            const res = await api('/game?action=start', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
+            if (!res.success) toast(res.error, 'error');
         }
-        
-        function handleGameStarted(data) {
+
+        function handleGameStart(data) {
             const myData = data.roles[state.playerId];
-            if (!myData) { showToast('Error al obtener rol', 'error'); return; }
+            if (!myData) return;
+            
             state.myRole = myData.role;
             state.myWord = myData.word;
             state.myHint = myData.hint;
             state.myCategory = myData.category;
-            showRevealScreen(data.totalPlayers);
-        }
-        
-        function showRevealScreen(totalPlayers) {
-            state.cardRevealed = false;
+            state.cardFlipped = false;
             state.isReady = false;
-            document.getElementById('reveal-card').classList.remove('revealed');
-            document.getElementById('btn-understood').classList.add('hidden');
-            document.getElementById('waiting-others').classList.add('hidden');
-            document.getElementById('total-count').textContent = totalPlayers;
+            state.turnOrder = [...state.players];
+            
+            document.getElementById('reveal-card').classList.remove('flipped');
+            document.getElementById('btn-ready').classList.add('hidden');
+            document.getElementById('ready-status').classList.add('hidden');
+            document.getElementById('ready-total').textContent = data.totalPlayers;
             document.getElementById('ready-count').textContent = '0';
             
-            const cardBack = document.getElementById('card-back-content');
+            const cardBack = document.getElementById('card-back');
             if (state.myRole === 'citizen') {
-                cardBack.className = 'card-back absolute inset-0 rounded-3xl flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-900 to-blue-700 glow-citizen';
-                cardBack.innerHTML = `<div class="text-5xl mb-4">🔵</div><p class="text-lg text-blue-200 mb-2">ERES</p><p class="text-3xl font-black mb-6">CIUDADANO</p><div class="bg-white/20 rounded-xl p-4 w-full"><p class="text-xs text-blue-200 mb-1">${state.myCategory}</p><p class="text-2xl font-bold">${state.myWord}</p></div><p class="text-sm text-blue-200 mt-4 text-center">Describe la palabra sin decirla.<br>¡Encuentra al impostor!</p>`;
+                cardBack.className = 'card-face card-back absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-6 bg-gradient-to-br from-citizen-600 to-citizen-500';
+                cardBack.innerHTML = `
+                    <div class="text-5xl mb-3">🔵</div>
+                    <p class="text-sm text-citizen-200 mb-1">ERES</p>
+                    <p class="text-2xl font-bold mb-4">CIUDADANO</p>
+                    <div class="bg-white/20 rounded-xl p-4 w-full text-center">
+                        <p class="text-[10px] text-citizen-200 mb-1">${state.myCategory}</p>
+                        <p class="text-xl font-bold">${state.myWord}</p>
+                    </div>
+                    <p class="text-xs text-citizen-200 mt-4 text-center">Describe la palabra sin decirla</p>
+                `;
             } else {
-                let hintHtml = state.myHint ? `<div class="bg-white/20 rounded-xl p-4 w-full mb-4"><p class="text-xs text-red-200 mb-1">💡 PISTA</p><p class="text-lg font-medium">${state.myHint}</p></div>` : '';
-                cardBack.className = 'card-back absolute inset-0 rounded-3xl flex flex-col items-center justify-center p-8 bg-gradient-to-br from-red-900 to-red-700 glow-impostor';
-                cardBack.innerHTML = `<div class="text-5xl mb-4">🔴</div><p class="text-lg text-red-200 mb-2">ERES EL</p><p class="text-4xl font-black mb-6">IMPOSTOR</p>${hintHtml}<p class="text-xs text-red-200 mb-1">${state.myCategory}</p><p class="text-sm text-red-200 text-center mt-2">No conoces la palabra.<br>¡Finge que sí!</p>`;
+                const hintHtml = state.myHint ? `<div class="bg-white/20 rounded-xl p-3 w-full text-center mb-3"><p class="text-[10px] text-impostor-200 mb-1">💡 PISTA</p><p class="text-sm font-medium">${state.myHint}</p></div>` : '';
+                cardBack.className = 'card-face card-back absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-6 bg-gradient-to-br from-impostor-600 to-impostor-500';
+                cardBack.innerHTML = `
+                    <div class="text-5xl mb-3">🔴</div>
+                    <p class="text-sm text-impostor-200 mb-1">ERES EL</p>
+                    <p class="text-2xl font-bold mb-4">IMPOSTOR</p>
+                    ${hintHtml}
+                    <p class="text-[10px] text-impostor-200">${state.myCategory}</p>
+                    <p class="text-xs text-impostor-200 mt-3 text-center">No conoces la palabra<br>¡Finge que sí!</p>
+                `;
             }
-            showScreen('reveal');
+            
+            navigateTo('reveal');
         }
-        
-        function revealCard() {
-            if (state.cardRevealed) return;
-            state.cardRevealed = true;
-            document.getElementById('reveal-card').classList.add('revealed');
-            setTimeout(() => { document.getElementById('btn-understood').classList.remove('hidden'); }, 700);
+
+        function flipCard() {
+            if (state.cardFlipped) return;
+            state.cardFlipped = true;
+            document.getElementById('reveal-card').classList.add('flipped');
+            setTimeout(() => { document.getElementById('btn-ready').classList.remove('hidden'); }, 500);
         }
-        
-        async function playerReady() {
+
+        async function markReady() {
             if (state.isReady) return;
             state.isReady = true;
-            document.getElementById('btn-understood').classList.add('hidden');
-            document.getElementById('waiting-others').classList.remove('hidden');
-            try { await apiCall('/game?action=ready', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
-            catch (error) { showToast('Error al marcar como listo', 'error'); }
+            document.getElementById('btn-ready').classList.add('hidden');
+            document.getElementById('ready-status').classList.remove('hidden');
+            await api('/game?action=ready', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
         }
-        
-        function handleReadyProgress(data) {
+
+        function updateReadyProgress(data) {
             document.getElementById('ready-count').textContent = data.ready;
-            document.getElementById('total-count').textContent = data.total;
+            document.getElementById('ready-total').textContent = data.total;
         }
-        
+
         function handleRoundStart(data) {
             document.getElementById('first-player-name').textContent = data.firstPlayerName;
-            document.getElementById('first-player-announcement').classList.remove('hidden');
-            setTimeout(() => { document.getElementById('first-player-announcement').classList.add('hidden'); }, 3000);
+            document.getElementById('first-player-overlay').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('first-player-overlay').classList.add('hidden'); }, 3000);
             
-            const roleBadge = document.getElementById('game-role-badge');
+            const badge = document.getElementById('game-role-badge');
             if (state.myRole === 'citizen') {
-                roleBadge.className = 'px-4 py-2 rounded-full text-sm font-bold bg-citizen/20 text-citizen';
-                roleBadge.textContent = '🔵 Ciudadano';
-                document.getElementById('game-category-label').textContent = state.myCategory;
-                document.getElementById('game-word-display').textContent = state.myWord;
-                document.getElementById('game-hint-container').classList.add('hidden');
+                badge.className = 'px-3 py-1.5 rounded-full text-xs font-bold bg-citizen-500/30 text-citizen-400 border border-citizen-500/30';
+                badge.textContent = '🔵 Ciudadano';
             } else {
-                roleBadge.className = 'px-4 py-2 rounded-full text-sm font-bold bg-impostor/20 text-impostor';
-                roleBadge.textContent = '🔴 Impostor';
-                document.getElementById('game-category-label').textContent = state.myCategory;
-                document.getElementById('game-word-display').textContent = '???';
-                if (state.myHint) {
-                    document.getElementById('game-hint-container').classList.remove('hidden');
-                    document.getElementById('game-hint-display').textContent = state.myHint;
-                } else {
-                    document.getElementById('game-hint-container').classList.add('hidden');
-                }
+                badge.className = 'px-3 py-1.5 rounded-full text-xs font-bold bg-impostor-500/30 text-impostor-400 border border-impostor-500/30';
+                badge.textContent = '🔴 Impostor';
             }
             
             if (state.isHost) document.getElementById('game-host-controls').classList.remove('hidden');
             else document.getElementById('game-host-controls').classList.add('hidden');
             
+            const firstIdx = state.turnOrder.findIndex(p => p.id === data.firstPlayerId);
+            if (firstIdx > 0) {
+                const before = state.turnOrder.slice(0, firstIdx);
+                const after = state.turnOrder.slice(firstIdx);
+                state.turnOrder = [...after, ...before];
+            }
+            state.currentTurnIndex = 0;
+            renderTurnOrder();
+            
+            state.chatMessages = [];
+            document.getElementById('chat-messages').innerHTML = '';
+            addSystemMessage('¡La ronda ha comenzado! Discutan quién podría ser el impostor.');
+            
             startTimer(data.timerEndTime, data.duration);
-            renderGamePlayers();
-            showScreen('game');
+            navigateTo('game');
         }
-        
-        function renderGamePlayers() {
-            const container = document.getElementById('game-players-list');
-            container.innerHTML = '';
-            state.players.forEach(player => {
-                const item = document.createElement('div');
-                item.className = 'glass rounded-xl p-4 flex items-center justify-between';
-                item.innerHTML = `<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold">${player.name.charAt(0).toUpperCase()}</div><p class="font-semibold">${escapeHtml(player.name)}</p></div><button onclick="accusePlayer('${player.id}')" class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition">Acusar</button>`;
-                container.appendChild(item);
-            });
+
+        function renderTurnOrder() {
+            const container = document.getElementById('turn-order');
+            container.innerHTML = state.turnOrder.map((p, i) => `
+                <div class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${i === state.currentTurnIndex ? 'turn-active' : 'bg-white/5'}">
+                    ${i === state.currentTurnIndex ? '<div class="turn-indicator"></div>' : `<span class="text-gray-500">${i + 1}</span>`}
+                    <span class="${i === state.currentTurnIndex ? 'text-white' : 'text-gray-400'}">${escapeHtml(p.name)}</span>
+                </div>
+            `).join('');
         }
-        
-        async function accusePlayer(playerId) {
-            try { await apiCall('/game?action=accuse', 'POST', { roomCode: state.roomCode, playerId: state.playerId, accusedId: playerId }); }
-            catch (error) { showToast('Error al acusar', 'error'); }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            addChatMessage({ playerName: state.playerName, playerId: state.playerId, text: text, timestamp: Date.now() });
+            await api('/game?action=chat', 'POST', { roomCode: state.roomCode, playerId: state.playerId, playerName: state.playerName, text: text });
         }
-        
+
+        function handleChatKeypress(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        }
+
+        function addChatMessage(msg) {
+            const msgKey = `${msg.playerId}-${msg.timestamp}`;
+            if (state.chatMessages.includes(msgKey)) return;
+            state.chatMessages.push(msgKey);
+            
+            const container = document.getElementById('chat-messages');
+            const isOwn = msg.playerId === state.playerId;
+            
+            const div = document.createElement('div');
+            div.className = `message rounded-lg p-2 ${isOwn ? 'message-own' : 'message-other'}`;
+            div.innerHTML = `<p class="text-[10px] ${isOwn ? 'text-accent-400' : 'text-gray-400'} mb-0.5">${escapeHtml(msg.playerName)}</p><p class="text-sm">${escapeHtml(msg.text)}</p>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'message message-system rounded-lg p-2 text-xs text-gray-400';
+            div.textContent = text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
         function startTimer(endTime, duration) {
             if (state.timerInterval) clearInterval(state.timerInterval);
-            const timerEl = document.getElementById('game-timer');
-            const circleEl = document.getElementById('timer-circle');
-            const circumference = 2 * Math.PI * 16;
-            circleEl.style.strokeDasharray = circumference;
             
-            function updateTimer() {
+            const timerEl = document.getElementById('game-timer');
+            const progressEl = document.getElementById('timer-progress');
+            const circumference = 2 * Math.PI * 16;
+            progressEl.style.strokeDasharray = circumference;
+            
+            function update() {
                 const now = Date.now();
                 const remaining = Math.max(0, endTime - now);
                 const seconds = Math.floor(remaining / 1000);
-                const minutes = Math.floor(seconds / 60);
+                const mins = Math.floor(seconds / 60);
                 const secs = seconds % 60;
-                timerEl.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+                
+                timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
                 const progress = remaining / (duration * 1000);
                 const offset = circumference * (1 - progress);
-                circleEl.style.strokeDashoffset = offset;
-                if (seconds <= 30) circleEl.style.stroke = '#ef4444';
-                else if (seconds <= 60) circleEl.style.stroke = '#f59e0b';
-                else circleEl.style.stroke = '#6366f1';
-                if (remaining <= 0) { clearInterval(state.timerInterval); timerEl.textContent = '0:00'; }
+                progressEl.style.strokeDashoffset = offset;
+                
+                if (seconds <= 30) progressEl.style.stroke = '#ef4444';
+                else if (seconds <= 60) progressEl.style.stroke = '#f59e0b';
+                else progressEl.style.stroke = '#8b5cf6';
+                
+                if (remaining <= 0) {
+                    clearInterval(state.timerInterval);
+                    timerEl.textContent = '0:00';
+                    addSystemMessage('⏰ ¡Se acabó el tiempo!');
+                }
             }
-            updateTimer();
-            state.timerInterval = setInterval(updateTimer, 1000);
+            
+            update();
+            state.timerInterval = setInterval(update, 1000);
         }
-        
+
         async function revealResults() {
             if (!state.isHost) return;
-            try { await apiCall('/game?action=results', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
-            catch (error) { showToast('Error al revelar resultados', 'error'); }
+            await api('/game?action=results', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
         }
-        
-        function showResultsScreen(data) {
-            if (state.timerInterval) clearInterval(state.timerInterval);
-            document.getElementById('result-category').textContent = data.category;
+
+        function showResults(data) {
+            if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
+            
             document.getElementById('result-word').textContent = data.word;
+            document.getElementById('result-category').textContent = data.category;
+            
             const container = document.getElementById('results-list');
-            container.innerHTML = '';
-            data.players.forEach(player => {
-                const item = document.createElement('div');
-                const roleClass = player.role === 'impostor' ? 'bg-impostor/20 border-impostor/30' : 'bg-citizen/20 border-citizen/30';
-                const roleText = player.role === 'impostor' ? '🔴 Impostor' : '🔵 Ciudadano';
-                const roleColor = player.role === 'impostor' ? 'text-impostor' : 'text-citizen';
-                item.className = `rounded-xl p-4 flex items-center justify-between border ${roleClass} animate-slide-up`;
-                item.innerHTML = `<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gradient-to-br ${player.role === 'impostor' ? 'from-red-500 to-red-700' : 'from-blue-500 to-blue-700'} flex items-center justify-center font-bold">${player.name.charAt(0).toUpperCase()}</div><div><p class="font-semibold">${escapeHtml(player.name)}</p>${player.isHost ? '<p class="text-xs text-purple-400">👑 Anfitrión</p>' : ''}</div></div><span class="font-bold ${roleColor}">${roleText}</span>`;
-                container.appendChild(item);
-            });
-            if (state.isHost) { document.getElementById('btn-new-round').classList.remove('hidden'); document.getElementById('waiting-new-round').classList.add('hidden'); }
-            else { document.getElementById('btn-new-round').classList.add('hidden'); document.getElementById('waiting-new-round').classList.remove('hidden'); }
-            showScreen('results');
+            container.innerHTML = data.players.map(p => {
+                const isImpostor = p.role === 'impostor';
+                return `
+                    <div class="glass rounded-xl p-3 flex items-center gap-3 animate-slide-in ${isImpostor ? 'border border-impostor-500/30' : ''}">
+                        <div class="w-10 h-10 rounded-full ${isImpostor ? 'bg-gradient-to-br from-impostor-500 to-impostor-600' : 'bg-gradient-to-br from-citizen-500 to-citizen-600'} flex items-center justify-center font-bold text-sm">
+                            ${p.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium truncate">${escapeHtml(p.name)}</p>
+                            ${p.isHost ? '<p class="text-[10px] text-accent-400">👑 Anfitrión</p>' : ''}
+                        </div>
+                        <span class="text-xs font-bold ${isImpostor ? 'text-impostor-400' : 'text-citizen-400'}">
+                            ${isImpostor ? '🔴 Impostor' : '🔵 Ciudadano'}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+            
+            if (state.isHost) {
+                document.getElementById('btn-new-round').classList.remove('hidden');
+                document.getElementById('waiting-new-round').classList.add('hidden');
+            } else {
+                document.getElementById('btn-new-round').classList.add('hidden');
+                document.getElementById('waiting-new-round').classList.remove('hidden');
+            }
+            
+            navigateTo('results');
         }
-        
+
         async function newRound() {
             if (!state.isHost) return;
-            try { await apiCall('/game?action=new-round', 'POST', { roomCode: state.roomCode, playerId: state.playerId }); }
-            catch (error) { showToast('Error al iniciar nueva ronda', 'error'); }
+            await api('/game?action=new-round', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
         }
-        
-        function handleBackToLobby() {
+
+        function backToLobby() {
             state.myRole = null; state.myWord = null; state.myHint = null; state.myCategory = null;
-            state.cardRevealed = false; state.isReady = false;
+            state.cardFlipped = false; state.isReady = false; state.chatMessages = [];
+            if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
             enterLobby();
         }
-        
-        function showError(element, message) { element.textContent = message; element.classList.remove('hidden'); }
-        function hideError(element) { element.classList.add('hidden'); }
-        
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            const colors = { info: 'bg-blue-500/90', success: 'bg-green-500/90', warning: 'bg-yellow-500/90', error: 'bg-red-500/90' };
-            toast.className = `${colors[type]} rounded-xl px-4 py-3 text-white font-medium shadow-lg animate-slide-up`;
-            toast.textContent = message;
-            container.appendChild(toast);
-            setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s ease'; setTimeout(() => toast.remove(), 300); }, 3000);
-        }
-        
+
+        function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+        function hideError(el) { el.classList.add('hidden'); }
         function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        function toast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const colors = { info: 'bg-accent-500/90', success: 'bg-success/90', warning: 'bg-yellow-500/90', error: 'bg-impostor-500/90' };
+            const div = document.createElement('div');
+            div.className = `toast ${colors[type]} rounded-xl px-4 py-3 text-sm font-medium shadow-lg pointer-events-auto`;
+            div.textContent = message;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        async function leaveRoom() {
+            if (!state.roomCode || !state.playerId) return;
+            stopHeartbeat(); stopPolling();
+            if (state.realtimeChannel) supabase.removeChannel(state.realtimeChannel);
+            await api('/rooms?action=leave', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('join-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+            window.addEventListener('beforeunload', leaveRoom);
+        });
     </script>
 </body>
 </html>

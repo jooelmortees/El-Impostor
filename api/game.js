@@ -294,6 +294,27 @@ async function handleNewRound(req, res) {
     return res.status(200).json({ success: true });
 }
 
+async function handleChat(req, res) {
+    const { roomCode, playerId, playerName, text } = req.body;
+    
+    if (!roomCode || !playerId || !text) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos incompletos' 
+        });
+    }
+    
+    // Emit chat message event
+    await emitGameEvent(roomCode, 'chat_message', {
+        playerId,
+        playerName,
+        text: text.substring(0, 200), // Limit message length
+        timestamp: Date.now()
+    });
+    
+    return res.status(200).json({ success: true });
+}
+
 // Main handler con routing
 export default async function handler(req, res) {
     setCorsHeaders(res);
@@ -325,10 +346,13 @@ export default async function handler(req, res) {
             case 'new-round':
                 return await handleNewRound(req, res);
                 
+            case 'chat':
+                return await handleChat(req, res);
+                
             default:
                 return res.status(400).json({ 
                     success: false, 
-                    error: 'Acción no válida. Usa: start, ready, accuse, results, new-round' 
+                    error: 'Acción no válida. Usa: start, ready, accuse, results, new-round, chat' 
                 });
         }
     } catch (error) {
