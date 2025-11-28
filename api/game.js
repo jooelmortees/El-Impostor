@@ -220,7 +220,7 @@ async function handleStartVote(req, res) {
         accusedName: accused.name,
         accuserName: accuser.name,
         votes: {}, // playerId -> vote ('guilty', 'innocent', 'null')
-        totalVoters: players.filter(p => !p.is_eliminated).length,
+        totalVoters: players.filter(p => !p.is_eliminated && p.id !== accusedId).length,
         startTime: Date.now()
     };
     
@@ -276,6 +276,14 @@ async function handleCastVote(req, res) {
         return res.status(403).json({ 
             success: false, 
             error: 'No puedes votar' 
+        });
+    }
+    
+    // Verificar que no sea el acusado
+    if (playerId === votingData.accusedId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'No puedes votar en tu propia acusación' 
         });
     }
     

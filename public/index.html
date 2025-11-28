@@ -361,6 +361,12 @@
                         <span class="inline-block animate-pulse text-2xl">🗳️</span>
                         <p class="text-sm text-gray-400 mt-2">Esperando que todos voten...</p>
                     </div>
+                    
+                    <div id="voting-accused-view" class="hidden text-center py-6">
+                        <div class="text-5xl mb-4">😰</div>
+                        <p class="text-lg font-bold text-impostor-400 mb-2">¡Te están acusando!</p>
+                        <p class="text-sm text-gray-400">Espera mientras los demás votan...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -369,9 +375,21 @@
         <div id="voting-result-modal" class="fixed inset-0 bg-dark/95 backdrop-blur-xl z-[100] flex items-center justify-center hidden">
             <div class="w-full max-w-sm mx-4 text-center animate-slide-in">
                 <div id="voting-result-content"></div>
-                <button onclick="closeVotingResult()" class="btn bg-white/10 mt-4 px-8 py-3 rounded-xl text-sm">
+                
+                <!-- Botones normales (continuar jugando) -->
+                <button id="voting-result-continue" onclick="closeVotingResult()" class="btn bg-white/10 mt-4 px-8 py-3 rounded-xl text-sm w-full">
                     Continuar
                 </button>
+                
+                <!-- Botones de fin de juego -->
+                <div id="voting-result-gameover-buttons" class="hidden space-y-2 mt-4">
+                    <button onclick="newRoundFromVoting()" class="btn btn-primary w-full py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+                        🔄 Jugar Otra Ronda
+                    </button>
+                    <button onclick="exitGame()" class="btn bg-white/10 w-full py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+                        🚪 Salir
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -418,7 +436,8 @@
             hintMode: false, chatEnabled: true, myRole: null, myWord: null, myHint: null, myCategory: null,
             cardFlipped: false, isReady: false, turnOrder: [], currentTurnIndex: 0,
             timerInterval: null, heartbeatInterval: null, pollInterval: null, realtimeChannel: null,
-            chatMessages: [], votingActive: false, hasVoted: false, eliminatedPlayers: []
+            chatMessages: [], votingActive: false, hasVoted: false, eliminatedPlayers: [],
+            currentAccusedId: null
         };
 
         let currentScreen = 'home';
@@ -870,6 +889,7 @@
         function handleVotingStarted(data) {
             state.votingActive = true;
             state.hasVoted = false;
+            state.currentAccusedId = data.accusedId;
             
             document.getElementById('voting-accused-text').innerHTML = 
                 `<span class="font-bold text-accent-400">${escapeHtml(data.accuserName)}</span> acusa a <span class="font-bold text-impostor-400">${escapeHtml(data.accusedName)}</span>`;
@@ -878,8 +898,17 @@
             document.getElementById('votes-total').textContent = data.totalVoters;
             document.getElementById('votes-progress-bar').style.width = '0%';
             
-            document.getElementById('voting-buttons').classList.remove('hidden');
+            // Verificar si soy el acusado
+            const isAccused = data.accusedId === state.playerId;
+            
+            document.getElementById('voting-buttons').classList.toggle('hidden', isAccused);
             document.getElementById('voting-waiting').classList.add('hidden');
+            document.getElementById('voting-accused-view').classList.toggle('hidden', !isAccused);
+            document.getElementById('voting-progress').classList.toggle('hidden', isAccused);
+            
+            if (isAccused) {
+                state.hasVoted = true; // El acusado no puede votar
+            }
             
             document.getElementById('voting-modal').classList.remove('hidden');
             
@@ -916,6 +945,7 @@
 
         function handleVotingResult(data) {
             state.votingActive = false;
+            state.currentAccusedId = null;
             document.getElementById('voting-modal').classList.add('hidden');
             
             let resultHtml = '';
@@ -953,30 +983,57 @@
             }
             
             document.getElementById('voting-result-content').innerHTML = resultHtml;
-            document.getElementById('voting-result-modal').classList.remove('hidden');
             
-            // Si el juego termina, mostrar mensaje de victoria y auto-navegar a resultados
+            // Mostrar/ocultar botones según si el juego terminó
+            const continueBtn = document.getElementById('voting-result-continue');
+            const gameOverBtns = document.getElementById('voting-result-gameover-buttons');
+            
             if (data.gameOver) {
-                const continueBtn = document.querySelector('#voting-result-modal button');
                 const winnerText = data.impostorsWin 
                     ? '<p class="text-impostor-400 font-bold mt-4 text-lg">🔴 ¡Los impostores ganan!</p>'
                     : '<p class="text-citizen-400 font-bold mt-4 text-lg">🔵 ¡Los ciudadanos ganan!</p>';
                 document.getElementById('voting-result-content').innerHTML += winnerText;
-                continueBtn.textContent = 'Ver Resultados';
-                continueBtn.onclick = () => {
-                    document.getElementById('voting-result-modal').classList.add('hidden');
-                    // Los resultados llegarán por evento game_results
-                };
+                
+                continueBtn.classList.add('hidden');
+                gameOverBtns.classList.remove('hidden');
+            } else {
+                continueBtn.classList.remove('hidden');
+                gameOverBtns.classList.add('hidden');
             }
+            
+            document.getElementById('voting-result-modal').classList.remove('hidden');
         }
 
         function closeVotingResult() {
             document.getElementById('voting-result-modal').classList.add('hidden');
         }
 
+        async function newRoundFromVoting() {
+            document.getElementById('voting-result-modal').classList.add('hidden');
+            await api('/game?action=new-round', 'POST', { roomCode: state.roomCode, playerId: state.playerId });
+        }
+
+        function exitGame() {
+            document.getElementById('voting-result-modal').classList.add('hidden');
+            leaveRoom();
+            // Resetear estado
+            state.roomCode = null;
+            state.roomId = null;
+            state.playerId = null;
+            state.playerName = null;
+            state.isHost = false;
+            state.players = [];
+            state.myRole = null;
+            state.myWord = null;
+            state.chatMessages = [];
+            state.eliminatedPlayers = [];
+            navigateTo('home');
+        }
+
         function handleVotingCancelled() {
             state.votingActive = false;
             state.hasVoted = false;
+            state.currentAccusedId = null;
             document.getElementById('voting-modal').classList.add('hidden');
             addSystemMessage('❌ La votación ha sido cancelada');
         }
