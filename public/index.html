@@ -4,16 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>El Impostor - Juego de Deducción Social</title>
-    
-    <!-- Google AdSense - Reemplaza ca-pub-XXXXXXXXXXXXXXXX con tu Publisher ID -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4042344511494204"crossorigin="anonymous"></script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
     <script>
         tailwind.config = {
             theme: {
@@ -429,43 +426,6 @@
     
     <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 space-y-2 pointer-events-none"></div>
     
-    <!-- MODAL: ANUNCIO INTERSTICIAL -->
-    <div id="ad-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
-        <div class="bg-surface-50 rounded-2xl max-w-md w-full overflow-hidden animate-scale-in">
-            <!-- Header del anuncio -->
-            <div class="bg-gradient-to-r from-accent-600 to-accent-500 p-4 text-center">
-                <p class="text-xs text-white/70 uppercase tracking-wider">Anuncio</p>
-                <p id="ad-countdown" class="text-2xl font-bold text-white">5</p>
-                <p class="text-xs text-white/70">La partida comenzará pronto...</p>
-            </div>
-            
-            <!-- Contenedor del anuncio de Google AdSense -->
-            <div class="p-4 bg-surface-100 min-h-[250px] flex items-center justify-center">
-                <!-- Anuncio de Google AdSense - Display Ad -->
-                <ins class="adsbygoogle"
-                     style="display:block;min-width:300px;min-height:250px;"
-                     data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-                     data-ad-slot="XXXXXXXXXX"
-                     data-ad-format="auto"
-                     data-full-width-responsive="true"></ins>
-                
-                <!-- Fallback cuando no hay anuncio (desarrollo/testing) -->
-                <div id="ad-fallback" class="text-center text-gray-500 hidden">
-                    <div class="text-6xl mb-4">📺</div>
-                    <p class="text-sm">Espacio publicitario</p>
-                    <p class="text-xs text-gray-600 mt-1">Configura tu ID de AdSense</p>
-                </div>
-            </div>
-            
-            <!-- Botón de saltar (aparece después de cuenta regresiva) -->
-            <div class="p-4 border-t border-white/10">
-                <button id="ad-skip-btn" onclick="closeAdAndStartGame()" class="btn btn-primary w-full py-3 rounded-xl opacity-50 cursor-not-allowed" disabled>
-                    <span id="ad-skip-text">Espera <span id="ad-skip-countdown">5</span>s...</span>
-                </button>
-            </div>
-        </div>
-    </div>
-    
     <script>
         const SUPABASE_URL = 'https://peizekgikurxuljldixj.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXpla2dpa3VyeHVsamxkaXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMTUzOTgsImV4cCI6MjA3OTg5MTM5OH0.FFixNbhEZfqd4Ikwet12J07Yjh6iidN5c7OeUJzN5LU';
@@ -769,74 +729,6 @@
             if (!res.success) toast(res.error, 'error');
         }
 
-        // ============================================
-        // SISTEMA DE ANUNCIOS
-        // ============================================
-        let pendingGameData = null;
-        let adCountdownInterval = null;
-        
-        function showAdModal(gameData) {
-            pendingGameData = gameData;
-            const modal = document.getElementById('ad-modal');
-            const skipBtn = document.getElementById('ad-skip-btn');
-            const skipText = document.getElementById('ad-skip-text');
-            const countdown = document.getElementById('ad-countdown');
-            const skipCountdown = document.getElementById('ad-skip-countdown');
-            
-            // Mostrar modal
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            
-            // Intentar cargar anuncio de AdSense
-            try {
-                (adsbygoogle = window.adsbygoogle || []).push({});
-            } catch (e) {
-                // Si falla AdSense, mostrar fallback
-                const fallback = document.getElementById('ad-fallback');
-                if (fallback) fallback.classList.remove('hidden');
-            }
-            
-            // Cuenta regresiva de 5 segundos
-            let seconds = 5;
-            countdown.textContent = seconds;
-            skipCountdown.textContent = seconds;
-            
-            adCountdownInterval = setInterval(() => {
-                seconds--;
-                countdown.textContent = seconds;
-                skipCountdown.textContent = seconds;
-                
-                if (seconds <= 0) {
-                    clearInterval(adCountdownInterval);
-                    skipBtn.disabled = false;
-                    skipBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    skipText.textContent = '▶ Continuar al juego';
-                    countdown.textContent = '✓';
-                }
-            }, 1000);
-        }
-        
-        function closeAdAndStartGame() {
-            if (adCountdownInterval) clearInterval(adCountdownInterval);
-            
-            const modal = document.getElementById('ad-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            
-            // Resetear estado del botón para próxima vez
-            const skipBtn = document.getElementById('ad-skip-btn');
-            const skipText = document.getElementById('ad-skip-text');
-            skipBtn.disabled = true;
-            skipBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            skipText.innerHTML = 'Espera <span id="ad-skip-countdown">5</span>s...';
-            
-            // Ahora procesar el inicio del juego
-            if (pendingGameData) {
-                processGameStart(pendingGameData);
-                pendingGameData = null;
-            }
-        }
-
         function handleGameStart(data) {
             console.log('handleGameStart called', data, 'myPlayerId:', state.playerId);
             
@@ -847,13 +739,6 @@
                 setTimeout(() => location.reload(), 2000);
                 return;
             }
-            
-            // Mostrar anuncio antes de iniciar el juego
-            showAdModal(data);
-        }
-        
-        function processGameStart(data) {
-            const myData = data.roles[state.playerId];
             
             // Guardar configuración de chat
             state.chatEnabled = data.chatEnabled !== false;
