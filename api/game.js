@@ -55,7 +55,9 @@ async function handleStart(req, res) {
     const settings = room.settings || { selectedCategories: ['animales'], impostorCount: 1, hintMode: false };
     const { word, hint, categoryName } = selectRandomWord(settings.selectedCategories);
     
-    const impostorCount = Math.min(settings.impostorCount || 1, Math.floor(players.length / 3));
+    // Permitir hasta la mitad de jugadores -1 como impostores (mínimo debe quedar 2 ciudadanos)
+    const maxImpostors = Math.max(1, players.length - 2);
+    const impostorCount = Math.min(settings.impostorCount || 1, maxImpostors);
     const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
     
     for (let i = 0; i < shuffledPlayers.length; i++) {
