@@ -4,7 +4,7 @@
 
 const WORDS_WITH_HINTS = {
     animales: {
-        name: "🐾 Animales",
+        name: "Animales",
         words: [
             { word: "Elefante", hints: ["Memoria prodigiosa", "Safari", "Muy pesado", "Orejas grandes", "Sabana"] },
             { word: "Delfín", hints: ["Acuático social", "Muy listo", "Acuario", "Nariz especial", "Flipper"] },
@@ -49,7 +49,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     profesiones: {
-        name: "👔 Profesiones",
+        name: "Profesiones",
         words: [
             { word: "Astronauta", hints: ["Gravedad cero", "Traje especial", "NASA", "Estrellas", "Cohete"] },
             { word: "Chef", hints: ["Estrella Michelin", "Gorro alto", "Cocina profesional", "Recetas", "Cuchillos"] },
@@ -94,7 +94,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     lugares: {
-        name: "🗺️ Lugares",
+        name: "Lugares",
         words: [
             { word: "Hospital", hints: ["Emergencias", "Batas", "Camillas", "Visitas", "Quirófano"] },
             { word: "Aeropuerto", hints: ["Embarque", "Terminal", "Pasaportes", "Retrasos", "Duty free"] },
@@ -139,7 +139,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     peliculas: {
-        name: "🎬 Películas/Series",
+        name: "Películas/Series",
         words: [
             { word: "Titanic", hints: ["1912", "Océano", "Trágico", "Romance", "Iceberg"] },
             { word: "Star Wars", hints: ["Galaxia", "Sables", "Imperio", "Fuerza", "Saga espacial"] },
@@ -184,7 +184,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     comida: {
-        name: "🍕 Comida",
+        name: "Comida",
         words: [
             { word: "Pizza", hints: ["Redonda", "Horno", "Toppings", "Italia", "Delivery popular"] },
             { word: "Sushi", hints: ["Japón", "Crudo", "Palillos", "Enrollado", "Algas"] },
@@ -229,7 +229,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     deportes: {
-        name: "⚽ Deportes",
+        name: "Deportes",
         words: [
             { word: "Fútbol", hints: ["Goles", "Equipos de 11", "Mundial", "Popular global", "Estadio"] },
             { word: "Baloncesto", hints: ["Aro", "Dribling", "NBA", "Alto", "Cancha"] },
@@ -274,7 +274,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     tecnologia: {
-        name: "💻 Tecnología",
+        name: "Tecnología",
         words: [
             { word: "Smartphone", hints: ["Bolsillo", "Táctil", "Apps", "Siempre conectado", "Notificaciones"] },
             { word: "Dron", hints: ["Aéreo", "Control remoto", "Cámara", "Hélices", "Vista superior"] },
@@ -319,7 +319,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     famosos: {
-        name: "⭐ Famosos",
+        name: "Famosos",
         words: [
             { word: "Messi", hints: ["Argentina", "Pequeño genio", "París luego Miami", "GOAT debate", "Copas del mundo"] },
             { word: "Cristiano Ronaldo", hints: ["Portugal", "Físico", "Goleador", "Arabia", "Siuuu"] },
@@ -364,7 +364,7 @@ const WORDS_WITH_HINTS = {
         ]
     },
     objetos: {
-        name: "🔧 Objetos",
+        name: "Objetos",
         words: [
             { word: "Paraguas", hints: ["Días grises", "Plegable", "Olvidable", "Protección", "Mango curvo"] },
             { word: "Reloj", hints: ["Muñeca", "Tiempo", "Segundero", "Alarma", "Puntualidad"] },
