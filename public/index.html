@@ -485,6 +485,7 @@
             cardFlipped: false, isReady: false, turnOrder: [], currentTurnIndex: 0,
             timerInterval: null, heartbeatInterval: null, pollInterval: null, realtimeChannel: null,
             chatMessages: [], votingActive: false, hasVoted: false, eliminatedPlayers: [],
+            eliminatedRoles: {}, // Guardar rol de cada eliminado: {playerId: 'impostor'|'citizen'}
             currentAccusedId: null, gameMode: 'online', // 'online' = múltiples dispositivos, 'local' = mismo dispositivo
             // Variables para modo local
             localRoles: null, localPlayerIndex: 0, localFirstPlayer: null, 
@@ -1086,7 +1087,9 @@
             document.getElementById('accuse-modal').classList.add('hidden');
             
             if (!state.eliminatedPlayers) state.eliminatedPlayers = [];
+            if (!state.eliminatedRoles) state.eliminatedRoles = {};
             state.eliminatedPlayers.push(playerId);
+            state.eliminatedRoles[playerId] = roleData.role; // Guardar rol del eliminado
             
             // Verificar si era el impostor
             if (roleData.role === 'impostor') {
@@ -1348,16 +1351,28 @@
             document.getElementById('votes-total').textContent = data.totalVoters;
             document.getElementById('votes-progress-bar').style.width = '0%';
             
-            // Verificar si soy el acusado
+            // Verificar si soy el acusado o estoy eliminado
             const isAccused = data.accusedId === state.playerId;
+            const isEliminated = state.eliminatedPlayers.includes(state.playerId);
+            const cannotVote = isAccused || isEliminated;
             
-            document.getElementById('voting-buttons').classList.toggle('hidden', isAccused);
+            document.getElementById('voting-buttons').classList.toggle('hidden', cannotVote);
             document.getElementById('voting-waiting').classList.add('hidden');
             document.getElementById('voting-accused-view').classList.toggle('hidden', !isAccused);
             document.getElementById('voting-progress').classList.toggle('hidden', isAccused);
             
-            if (isAccused) {
-                state.hasVoted = true; // El acusado no puede votar
+            if (cannotVote) {
+                state.hasVoted = true; // El acusado y los eliminados no pueden votar
+            }
+            
+            // Si estoy eliminado, mostrar mensaje especial
+            if (isEliminated && !isAccused) {
+                document.getElementById('voting-accused-view').classList.remove('hidden');
+                document.getElementById('voting-accused-view').innerHTML = `
+                    <div class="text-5xl mb-4">👻</div>
+                    <p class="text-lg font-bold text-gray-400 mb-2">Estás eliminado</p>
+                    <p class="text-sm text-gray-500">No puedes participar en la votación</p>
+                `;
             }
             
             document.getElementById('voting-modal').classList.remove('hidden');
@@ -1402,6 +1417,7 @@
             
             if (data.isEliminated) {
                 state.eliminatedPlayers.push(data.accusedId);
+                state.eliminatedRoles[data.accusedId] = data.eliminatedRole; // Guardar rol del eliminado
                 
                 const roleColor = data.eliminatedRole === 'impostor' ? 'text-impostor-400' : 'text-citizen-400';
                 const roleText = data.eliminatedRole === 'impostor' ? '🔴 IMPOSTOR' : '🔵 CIUDADANO';
@@ -1492,21 +1508,28 @@
             const container = document.getElementById('turn-order');
             container.innerHTML = state.turnOrder.map((p, i) => {
                 const isEliminated = state.eliminatedPlayers.includes(p.id);
-                const isCurrent = i === state.currentTurnIndex && !isEliminated;
+                const eliminatedRole = state.eliminatedRoles[p.id];
                 
                 if (isEliminated) {
+                    // Mostrar en rojo si era impostor, azul si era ciudadano
+                    const isImpostor = eliminatedRole === 'impostor';
+                    const bgColor = isImpostor ? 'bg-impostor-500/20' : 'bg-citizen-500/20';
+                    const textColor = isImpostor ? 'text-impostor-400' : 'text-citizen-400';
+                    const emoji = isImpostor ? '🔴' : '🔵';
+                    
                     return `
-                        <div class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 bg-impostor-500/20 opacity-50">
-                            <span class="text-impostor-400">💀</span>
-                            <span class="text-gray-500 line-through">${escapeHtml(p.name)}</span>
+                        <div class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${bgColor} opacity-70">
+                            <span>${emoji}</span>
+                            <span class="${textColor} line-through">${escapeHtml(p.name)}</span>
                         </div>
                     `;
                 }
                 
+                // Todos los jugadores vivos tienen el mismo estilo (sin indicador verde)
                 return `
-                    <div class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${isCurrent ? 'turn-active' : 'bg-white/5'}">
-                        ${isCurrent ? '<div class="turn-indicator"></div>' : `<span class="text-gray-500">${i + 1}</span>`}
-                        <span class="${isCurrent ? 'text-white' : 'text-gray-400'}">${escapeHtml(p.name)}</span>
+                    <div class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 bg-white/5">
+                        <span class="text-gray-500">${i + 1}</span>
+                        <span class="text-gray-400">${escapeHtml(p.name)}</span>
                     </div>
                 `;
             }).join('');
