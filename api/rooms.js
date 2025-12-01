@@ -50,11 +50,13 @@ async function handleCreate(req, res) {
         });
     }
     
+    const gameMode = req.body.gameMode || 'online';
     const tempHostId = '00000000-0000-0000-0000-000000000000';
     const room = await createRoom(code, tempHostId, {
         impostorCount: 1,
         hintMode: false,
-        selectedCategories: ['animales', 'profesiones', 'lugares']
+        selectedCategories: ['animales', 'profesiones', 'lugares'],
+        gameMode: gameMode
     });
     
     const player = await createPlayer(room.id, name, true);
@@ -70,7 +72,8 @@ async function handleCreate(req, res) {
         roomId: room.id,
         playerId: player.id,
         isHost: true,
-        categories: getCategories()
+        categories: getCategories(),
+        gameMode: gameMode
     });
 }
 
@@ -126,7 +129,8 @@ async function handleJoin(req, res) {
         roomId: room.id,
         playerId: player.id,
         isHost: false,
-        categories: getCategories()
+        categories: getCategories(),
+        gameMode: room.settings?.gameMode || 'online'
     });
 }
 
@@ -163,6 +167,68 @@ async function handlePlayers(req, res) {
         players: playersList,
         settings: room.settings,
         gameState: room.game_state
+    });
+}
+
+async function handleAddLocalPlayer(req, res) {
+    const { roomId, playerName } = req.body;
+    
+    if (!roomId || !playerName || playerName.trim().length < 2) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos inválidos' 
+        });
+    }
+    
+    const name = playerName.trim().substring(0, 15);
+    
+    const nameTaken = await isNameTakenInRoom(roomId, name);
+    if (nameTaken) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Ese nombre ya está en uso' 
+        });
+    }
+    
+    const player = await createPlayer(roomId, name, false);
+    
+    return res.status(200).json({
+        success: true,
+        playerId: player.id,
+        playerName: name
+    });
+}
+
+async function handleRemovePlayer(req, res) {
+    const { roomId, playerId } = req.body;
+    
+    if (!roomId || !playerId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Datos inválidos' 
+        });
+    }
+    
+    const player = await getPlayerById(playerId);
+    
+    if (!player || player.room_id !== roomId) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Jugador no encontrado' 
+        });
+    }
+    
+    if (player.is_host) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'No puedes eliminar al anfitrión' 
+        });
+    }
+    
+    await deletePlayer(playerId);
+    
+    return res.status(200).json({
+        success: true
     });
 }
 
@@ -317,11 +383,19 @@ export default async function handler(req, res) {
             case 'leave':
                 if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
                 return await handleLeave(req, res);
+            
+            case 'addLocalPlayer':
+                if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+                return await handleAddLocalPlayer(req, res);
+            
+            case 'removePlayer':
+                if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+                return await handleRemovePlayer(req, res);
                 
             default:
                 return res.status(400).json({ 
                     success: false, 
-                    error: 'Acción no válida. Usa: create, join, players, settings, heartbeat, leave' 
+                    error: 'Acción no válida' 
                 });
         }
     } catch (error) {

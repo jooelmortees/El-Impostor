@@ -99,7 +99,45 @@ async function handleStart(req, res) {
 }
 
 async function handleReady(req, res) {
-    const { roomCode, playerId } = req.body;
+    const { roomCode, roomId, playerId, allReady } = req.body;
+    
+    // Modo local: marcar todos como listos de una vez
+    if (allReady && roomId) {
+        const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+        if (!room) {
+            return res.status(404).json({ success: false, error: 'Sala no encontrada' });
+        }
+        
+        const players = await getPlayersByRoom(roomId);
+        
+        // Marcar todos como listos
+        for (const player of players) {
+            await updatePlayer(player.id, { is_ready: true });
+        }
+        
+        // Iniciar ronda directamente
+        const citizens = players.filter(p => p.role === 'citizen');
+        const pool = citizens.length > 0 ? citizens : players;
+        const firstPlayer = pool[Math.floor(Math.random() * pool.length)];
+        
+        const roundDuration = room.round_duration || 300;
+        const timerEndTime = Date.now() + (roundDuration * 1000);
+        
+        await updateRoom(roomId, {
+            game_state: 'playing',
+            first_player_id: firstPlayer.id,
+            timer_end_time: timerEndTime
+        });
+        
+        await emitGameEvent(room.code, 'round_start', {
+            firstPlayerName: firstPlayer.name,
+            firstPlayerId: firstPlayer.id,
+            timerEndTime,
+            duration: roundDuration
+        });
+        
+        return res.status(200).json({ success: true });
+    }
     
     if (!roomCode || !playerId) {
         return res.status(400).json({ 

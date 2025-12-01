@@ -9,10 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="./favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="./favicon.png">
-    <link rel="shortcut icon" type="image/png" href="./favicon.png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
     <script>
         tailwind.config = {
             theme: {
@@ -77,6 +74,10 @@
         .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.2s; }
         .toggle.active { background: #8b5cf6; }
         .toggle.active::after { transform: translateX(22px); }
+        
+        .game-mode-btn { transition: all 0.2s ease; }
+        .game-mode-btn:hover { transform: translateY(-2px); }
+        .game-mode-btn.selected { border-color: #8b5cf6 !important; background: rgba(139, 92, 246, 0.1); }
         
         .chat-container { display: flex; flex-direction: column; height: 100%; }
         .chat-messages { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
@@ -146,6 +147,32 @@
                         <input type="text" id="create-name" placeholder="Ej: Carlos" maxlength="12" class="w-full bg-surface-100 rounded-xl px-4 py-3 text-base outline-none border border-transparent focus:border-accent-500">
                     </div>
                     <p id="create-error" class="text-impostor-400 text-xs hidden"></p>
+                    
+                    <!-- Selección de modo de juego -->
+                    <div class="space-y-3">
+                        <label class="text-xs text-gray-400 block">Modo de juego</label>
+                        <div class="grid grid-cols-1 gap-3">
+                            <button onclick="selectGameMode('online')" id="mode-online" class="game-mode-btn selected bg-surface-100 border-2 border-accent-500 rounded-xl p-4 text-left transition-all">
+                                <div class="flex items-center gap-3">
+                                    <div class="text-2xl">📱</div>
+                                    <div>
+                                        <div class="font-semibold text-sm">Múltiples dispositivos</div>
+                                        <div class="text-xs text-gray-400">Cada jugador usa su móvil</div>
+                                    </div>
+                                </div>
+                            </button>
+                            <button onclick="selectGameMode('local')" id="mode-local" class="game-mode-btn bg-surface-100 border-2 border-transparent rounded-xl p-4 text-left transition-all hover:border-gray-600">
+                                <div class="flex items-center gap-3">
+                                    <div class="text-2xl">📲</div>
+                                    <div>
+                                        <div class="font-semibold text-sm">Mismo dispositivo</div>
+                                        <div class="text-xs text-gray-400">Se pasan el móvil por turnos</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <button onclick="createRoom()" class="btn btn-primary w-full py-4 rounded-xl flex items-center justify-center gap-2">
                         <span id="create-spinner" class="spinner hidden"></span>
                         <span id="create-text">Crear Sala</span>
@@ -190,6 +217,10 @@
                     <p class="text-[10px] text-gray-500 uppercase tracking-wider">Código</p>
                     <p id="lobby-code" class="text-xl font-bold text-accent-400 tracking-widest">----</p>
                 </div>
+                <div id="mode-indicator" class="text-center">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider">Modo</p>
+                    <p id="mode-text" class="text-sm font-semibold text-gray-300">📱 Online</p>
+                </div>
                 <div class="text-right">
                     <p class="text-[10px] text-gray-500 uppercase tracking-wider">Jugadores</p>
                     <p id="lobby-count" class="text-xl font-bold">0</p>
@@ -197,6 +228,20 @@
             </header>
             
             <div class="flex-1 overflow-y-auto p-4">
+                <!-- Añadir jugador en modo local -->
+                <div id="local-add-player" class="hidden mb-4">
+                    <div class="glass rounded-xl p-4">
+                        <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Añadir jugador</h3>
+                        <div class="flex gap-2">
+                            <input type="text" id="local-player-name" placeholder="Nombre del jugador" maxlength="12" class="flex-1 bg-surface-100 rounded-lg px-3 py-2 text-sm outline-none border border-transparent focus:border-accent-500">
+                            <button onclick="addLocalPlayer()" class="btn bg-accent-600 hover:bg-accent-500 px-4 py-2 rounded-lg text-sm font-semibold">
+                                + Añadir
+                            </button>
+                        </div>
+                        <p id="local-add-error" class="text-impostor-400 text-xs mt-2 hidden"></p>
+                    </div>
+                </div>
+                
                 <div class="mb-6">
                     <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">En la sala</h3>
                     <div id="players-list" class="space-y-2"></div>
@@ -254,7 +299,7 @@
                 </div>
             </div>
             <button id="btn-ready" onclick="markReady()" class="btn btn-primary w-full max-w-xs py-4 rounded-xl mt-6 hidden">
-                ¡Entendido!
+                <span id="btn-ready-text">¡Entendido!</span>
             </button>
             <div id="ready-status" class="glass rounded-xl py-4 px-6 mt-6 hidden">
                 <p class="text-gray-300 text-sm">Esperando a los demás...</p>
@@ -440,10 +485,24 @@
             cardFlipped: false, isReady: false, turnOrder: [], currentTurnIndex: 0,
             timerInterval: null, heartbeatInterval: null, pollInterval: null, realtimeChannel: null,
             chatMessages: [], votingActive: false, hasVoted: false, eliminatedPlayers: [],
-            currentAccusedId: null
+            currentAccusedId: null, gameMode: 'online' // 'online' = múltiples dispositivos, 'local' = mismo dispositivo
         };
 
         let currentScreen = 'home';
+        let selectedGameMode = 'online';
+        
+        function selectGameMode(mode) {
+            selectedGameMode = mode;
+            document.querySelectorAll('.game-mode-btn').forEach(btn => {
+                btn.classList.remove('selected', 'border-accent-500');
+                btn.classList.add('border-transparent');
+            });
+            const selectedBtn = document.getElementById(`mode-${mode}`);
+            if (selectedBtn) {
+                selectedBtn.classList.add('selected', 'border-accent-500');
+                selectedBtn.classList.remove('border-transparent');
+            }
+        }
         
         function navigateTo(screenId) {
             const oldScreen = document.getElementById(`screen-${currentScreen}`);
@@ -485,7 +544,8 @@
             spinner.classList.remove('hidden');
             text.textContent = 'Creando...';
             
-            const res = await api('/rooms?action=create', 'POST', { playerName: name });
+            state.gameMode = selectedGameMode;
+            const res = await api('/rooms?action=create', 'POST', { playerName: name, gameMode: selectedGameMode });
             
             spinner.classList.add('hidden');
             text.textContent = 'Crear Sala';
@@ -496,6 +556,7 @@
                 state.playerId = res.playerId;
                 state.playerName = name;
                 state.isHost = true;
+                state.gameMode = res.gameMode || selectedGameMode;
                 state.categories = res.categories || [];
                 enterLobby();
             } else {
@@ -529,6 +590,7 @@
                 state.playerName = name;
                 state.isHost = false;
                 state.categories = res.categories || [];
+                state.gameMode = res.gameMode || 'online';
                 enterLobby();
             } else {
                 showError(errorEl, res.error);
@@ -539,21 +601,66 @@
             navigateTo('lobby');
             document.getElementById('lobby-code').textContent = state.roomCode;
             
+            // Mostrar modo de juego
+            const modeText = document.getElementById('mode-text');
+            if (state.gameMode === 'local') {
+                modeText.textContent = '📲 Local';
+                // En modo local, ocultar el código ya que no necesitan unirse
+                document.getElementById('lobby-code').parentElement.classList.add('hidden');
+            } else {
+                modeText.textContent = '📱 Online';
+                document.getElementById('lobby-code').parentElement.classList.remove('hidden');
+            }
+            
             if (state.isHost) {
                 document.getElementById('host-controls').classList.remove('hidden');
                 document.getElementById('btn-start').classList.remove('hidden');
                 document.getElementById('waiting-msg').classList.add('hidden');
                 renderCategories();
+                
+                // En modo local, mostrar opción para añadir jugadores
+                if (state.gameMode === 'local') {
+                    document.getElementById('local-add-player').classList.remove('hidden');
+                } else {
+                    document.getElementById('local-add-player').classList.add('hidden');
+                }
             } else {
                 document.getElementById('host-controls').classList.add('hidden');
                 document.getElementById('btn-start').classList.add('hidden');
                 document.getElementById('waiting-msg').classList.remove('hidden');
+                document.getElementById('local-add-player').classList.add('hidden');
             }
             
             setupRealtime();
             startPolling();
             startHeartbeat();
             fetchPlayers();
+        }
+        
+        async function addLocalPlayer() {
+            const nameInput = document.getElementById('local-player-name');
+            const name = nameInput.value.trim();
+            const errorEl = document.getElementById('local-add-error');
+            
+            if (name.length < 2) {
+                showError(errorEl, 'Mínimo 2 caracteres');
+                return;
+            }
+            
+            hideError(errorEl);
+            
+            const res = await api('/rooms?action=addLocalPlayer', 'POST', {
+                roomId: state.roomId,
+                playerName: name
+            });
+            
+            if (res.success) {
+                nameInput.value = '';
+                toast(`${name} añadido`, 'success');
+                fetchPlayers();
+            } else {
+                showError(errorEl, res.error);
+            }
         }
 
         function setupRealtime() {
@@ -638,10 +745,31 @@
                         <p class="font-medium truncate">${escapeHtml(p.name)}</p>
                         ${p.isHost ? '<p class="text-[10px] text-accent-400">👑 Anfitrión</p>' : ''}
                     </div>
+                    ${state.gameMode === 'local' && state.isHost && !p.isHost ? `
+                        <button onclick="removeLocalPlayer('${p.id}', '${escapeHtml(p.name)}')" class="p-2 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    ` : ''}
                 </div>
             `).join('');
             
             updateStartButton(players.length);
+        }
+        
+        async function removeLocalPlayer(playerId, playerName) {
+            if (!confirm(`¿Eliminar a ${playerName}?`)) return;
+            
+            const res = await api('/rooms?action=removePlayer', 'POST', {
+                roomId: state.roomId,
+                playerId: playerId
+            });
+            
+            if (res.success) {
+                toast(`${playerName} eliminado`, 'info');
+                fetchPlayers();
+            } else {
+                toast(res.error || 'Error al eliminar', 'error');
+            }
         }
 
         function updateStartButton(count) {
@@ -734,6 +862,21 @@
         function handleGameStart(data) {
             console.log('handleGameStart called', data, 'myPlayerId:', state.playerId);
             
+            // Guardar configuración de chat
+            state.chatEnabled = data.chatEnabled !== false;
+            state.turnOrder = [...state.players];
+            state.cardFlipped = false;
+            state.isReady = false;
+            
+            // Modo local: mostrar cartas una por una
+            if (state.gameMode === 'local' && state.isHost) {
+                state.localRoles = data.roles;
+                state.localPlayerIndex = 0;
+                state.localReadyCount = 0;
+                showLocalPlayerCard();
+                return;
+            }
+            
             const myData = data.roles[state.playerId];
             if (!myData) {
                 console.error('No role data for player:', state.playerId, 'Available roles:', Object.keys(data.roles));
@@ -742,16 +885,10 @@
                 return;
             }
             
-            // Guardar configuración de chat
-            state.chatEnabled = data.chatEnabled !== false;
-            
             state.myRole = myData.role;
             state.myWord = myData.word;
             state.myHint = myData.hint;
             state.myCategory = myData.category;
-            state.cardFlipped = false;
-            state.isReady = false;
-            state.turnOrder = [...state.players];
             
             document.getElementById('reveal-card').classList.remove('flipped');
             document.getElementById('btn-ready').classList.add('hidden');
@@ -759,44 +896,110 @@
             document.getElementById('ready-total').textContent = data.totalPlayers;
             document.getElementById('ready-count').textContent = '0';
             
+            renderCardContent(state.myRole, state.myWord, state.myHint, state.myCategory);
+            navigateTo('reveal');
+        }
+        
+        function showLocalPlayerCard() {
+            const players = state.players;
+            if (state.localPlayerIndex >= players.length) {
+                // Todos vieron su carta, iniciar ronda
+                startLocalRound();
+                return;
+            }
+            
+            const currentPlayer = players[state.localPlayerIndex];
+            const roleData = state.localRoles[currentPlayer.id];
+            
+            state.cardFlipped = false;
+            document.getElementById('reveal-card').classList.remove('flipped');
+            document.getElementById('btn-ready').classList.add('hidden');
+            document.getElementById('ready-status').classList.add('hidden');
+            
+            // Mostrar pantalla de "Pasa el móvil a X"
+            const cardFront = document.getElementById('card-front');
+            cardFront.innerHTML = `
+                <div class="text-5xl mb-4">📱</div>
+                <p class="text-sm text-gray-400 mb-2">Pasa el móvil a</p>
+                <p class="text-2xl font-bold text-accent-400">${currentPlayer.name}</p>
+                <p class="text-xs text-gray-500 mt-4">Toca para ver tu carta</p>
+            `;
+            
+            renderCardContent(roleData.role, roleData.word, roleData.hint, roleData.category);
+            navigateTo('reveal');
+        }
+        
+        function renderCardContent(role, word, hint, category) {
             const cardBack = document.getElementById('card-back');
-            if (state.myRole === 'citizen') {
+            if (role === 'citizen') {
                 cardBack.className = 'card-face card-back absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-6 bg-gradient-to-br from-citizen-600 to-citizen-500';
                 cardBack.innerHTML = `
                     <div class="text-5xl mb-3">🔵</div>
                     <p class="text-sm text-citizen-200 mb-1">ERES</p>
                     <p class="text-2xl font-bold mb-4">CIUDADANO</p>
                     <div class="bg-white/20 rounded-xl p-4 w-full text-center">
-                        <p class="text-[10px] text-citizen-200 mb-1">${state.myCategory}</p>
-                        <p class="text-xl font-bold">${state.myWord}</p>
+                        <p class="text-[10px] text-citizen-200 mb-1">${category}</p>
+                        <p class="text-xl font-bold">${word}</p>
                     </div>
                     <p class="text-xs text-citizen-200 mt-4 text-center">Describe la palabra sin decirla</p>
                 `;
             } else {
-                const hintHtml = state.myHint ? `<div class="bg-white/20 rounded-xl p-3 w-full text-center mb-3"><p class="text-[10px] text-impostor-200 mb-1">💡 PISTA</p><p class="text-sm font-medium">${state.myHint}</p></div>` : '';
+                const hintHtml = hint ? `<div class="bg-white/20 rounded-xl p-3 w-full text-center mb-3"><p class="text-[10px] text-impostor-200 mb-1">💡 PISTA</p><p class="text-sm font-medium">${hint}</p></div>` : '';
                 cardBack.className = 'card-face card-back absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-6 bg-gradient-to-br from-impostor-600 to-impostor-500';
                 cardBack.innerHTML = `
                     <div class="text-5xl mb-3">🔴</div>
                     <p class="text-sm text-impostor-200 mb-1">ERES EL</p>
                     <p class="text-2xl font-bold mb-4">IMPOSTOR</p>
                     ${hintHtml}
-                    <p class="text-[10px] text-impostor-200">${state.myCategory}</p>
+                    <p class="text-[10px] text-impostor-200">${category}</p>
                     <p class="text-xs text-impostor-200 mt-3 text-center">No conoces la palabra<br>¡Finge que sí!</p>
                 `;
             }
-            
-            navigateTo('reveal');
+        }
+        
+        function startLocalRound() {
+            // Emitir que todos están listos en modo local
+            api('/game?action=ready', 'POST', { roomId: state.roomId, playerId: state.playerId, allReady: true });
         }
 
         function flipCard() {
             if (state.cardFlipped) return;
             state.cardFlipped = true;
             document.getElementById('reveal-card').classList.add('flipped');
-            setTimeout(() => { document.getElementById('btn-ready').classList.remove('hidden'); }, 500);
+            setTimeout(() => {
+                document.getElementById('btn-ready').classList.remove('hidden');
+                // Cambiar texto del botón en modo local
+                const btnText = document.getElementById('btn-ready-text');
+                if (state.gameMode === 'local' && state.isHost && state.localRoles) {
+                    if (state.localPlayerIndex >= state.players.length - 1) {
+                        btnText.textContent = '¡Empezar ronda!';
+                    } else {
+                        btnText.textContent = 'Siguiente jugador →';
+                    }
+                } else {
+                    btnText.textContent = '¡Entendido!';
+                }
+            }, 500);
         }
 
         async function markReady() {
             if (state.isReady) return;
+            
+            // Modo local: pasar al siguiente jugador
+            if (state.gameMode === 'local' && state.isHost && state.localRoles) {
+                state.localPlayerIndex++;
+                state.localReadyCount++;
+                
+                if (state.localPlayerIndex >= state.players.length) {
+                    // Todos vieron su carta
+                    startLocalRound();
+                } else {
+                    // Mostrar carta del siguiente jugador
+                    showLocalPlayerCard();
+                }
+                return;
+            }
+            
             state.isReady = true;
             document.getElementById('btn-ready').classList.add('hidden');
             document.getElementById('ready-status').classList.remove('hidden');
