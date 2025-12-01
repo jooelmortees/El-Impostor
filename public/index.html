@@ -290,7 +290,7 @@
         <div id="screen-reveal" class="screen flex-col items-center justify-center h-full p-6">
             <div id="reveal-card" class="card-container w-full max-w-xs aspect-[3/4] cursor-pointer" onclick="flipCard()">
                 <div class="card-inner relative w-full h-full">
-                    <div class="card-face absolute inset-0 glass-strong rounded-2xl flex flex-col items-center justify-center p-6">
+                    <div id="card-front" class="card-face absolute inset-0 glass-strong rounded-2xl flex flex-col items-center justify-center p-6">
                         <div class="text-6xl mb-4 animate-float">🎴</div>
                         <p class="text-xl font-bold text-center">Toca para revelar</p>
                         <p class="text-gray-400 text-sm mt-2">Tu rol secreto</p>
@@ -485,7 +485,10 @@
             cardFlipped: false, isReady: false, turnOrder: [], currentTurnIndex: 0,
             timerInterval: null, heartbeatInterval: null, pollInterval: null, realtimeChannel: null,
             chatMessages: [], votingActive: false, hasVoted: false, eliminatedPlayers: [],
-            currentAccusedId: null, gameMode: 'online' // 'online' = múltiples dispositivos, 'local' = mismo dispositivo
+            currentAccusedId: null, gameMode: 'online', // 'online' = múltiples dispositivos, 'local' = mismo dispositivo
+            // Variables para modo local
+            localRoles: null, localPlayerIndex: 0, localFirstPlayer: null, 
+            localReadyToStart: false, localTimer: 300, localTimerInterval: null, settings: null
         };
 
         let currentScreen = 'home';
@@ -903,8 +906,8 @@
         function showLocalPlayerCard() {
             const players = state.players;
             if (state.localPlayerIndex >= players.length) {
-                // Todos vieron su carta, iniciar ronda
-                startLocalRound();
+                // Todos vieron su carta, mostrar pantalla de inicio
+                showLocalStartScreen();
                 return;
             }
             
@@ -926,6 +929,40 @@
             `;
             
             renderCardContent(roleData.role, roleData.word, roleData.hint, roleData.category);
+            navigateTo('reveal');
+        }
+        
+        function showLocalStartScreen() {
+            // Seleccionar primer jugador aleatorio
+            const randomIdx = Math.floor(Math.random() * state.players.length);
+            state.localFirstPlayer = state.players[randomIdx];
+            
+            const cardFront = document.getElementById('card-front');
+            cardFront.innerHTML = `
+                <div class="text-6xl mb-4">🎯</div>
+                <p class="text-sm text-gray-400 mb-2">Empieza describiendo</p>
+                <p class="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">${state.localFirstPlayer.name}</p>
+            `;
+            
+            const cardBack = document.getElementById('card-back');
+            cardBack.className = 'card-face card-back absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-6 bg-gradient-to-br from-accent-600 to-accent-500';
+            cardBack.innerHTML = `
+                <div class="text-6xl mb-4">🎯</div>
+                <p class="text-sm text-accent-200 mb-2">Empieza describiendo</p>
+                <p class="text-3xl font-bold">${state.localFirstPlayer.name}</p>
+            `;
+            
+            state.cardFlipped = false;
+            document.getElementById('reveal-card').classList.remove('flipped');
+            document.getElementById('btn-ready').classList.add('hidden');
+            
+            // Mostrar botón de iniciar directamente
+            setTimeout(() => {
+                document.getElementById('btn-ready').classList.remove('hidden');
+                document.getElementById('btn-ready-text').textContent = '¡Iniciar partida!';
+            }, 500);
+            
+            state.localReadyToStart = true;
             navigateTo('reveal');
         }
         
@@ -961,9 +998,181 @@
             // Emitir que todos están listos en modo local
             api('/game?action=ready', 'POST', { roomId: state.roomId, playerId: state.playerId, allReady: true });
         }
+        
+        function startLocalGame() {
+            // Iniciar el juego en modo local
+            state.localReadyToStart = false;
+            
+            // Configurar orden de turnos
+            state.turnOrder = [...state.players];
+            const firstIdx = state.turnOrder.findIndex(p => p.id === state.localFirstPlayer.id);
+            if (firstIdx > 0) {
+                const before = state.turnOrder.slice(0, firstIdx);
+                const after = state.turnOrder.slice(firstIdx);
+                state.turnOrder = [...after, ...before];
+            }
+            state.currentTurnIndex = 0;
+            
+            // Configurar timer local
+            state.localTimer = state.settings?.roundTime || 300;
+            state.localTimerInterval = null;
+            
+            // Mostrar pantalla de juego
+            document.getElementById('game-room-code').textContent = state.roomCode;
+            
+            // Ocultar chat en modo local
+            const chatContainer = document.querySelector('#screen-game .glass.rounded-xl.flex-1');
+            if (chatContainer) {
+                chatContainer.classList.add('hidden');
+            }
+            
+            // Cambiar botón de acusar a eliminar jugador
+            const accuseBtn = document.getElementById('btn-accuse');
+            if (accuseBtn) {
+                accuseBtn.innerHTML = '❌ Eliminar Jugador';
+                accuseBtn.onclick = openLocalEliminateModal;
+            }
+            
+            renderTurnOrder();
+            navigateTo('game');
+            
+            // Iniciar timer
+            startLocalTimer();
+        }
+        
+        function startLocalTimer() {
+            updateLocalTimerDisplay();
+            state.localTimerInterval = setInterval(() => {
+                state.localTimer--;
+                updateLocalTimerDisplay();
+                if (state.localTimer <= 0) {
+                    clearInterval(state.localTimerInterval);
+                    // Tiempo agotado - los ciudadanos pierden
+                    showLocalResult('impostor');
+                }
+            }, 1000);
+        }
+        
+        function updateLocalTimerDisplay() {
+            const mins = Math.floor(state.localTimer / 60);
+            const secs = state.localTimer % 60;
+            document.getElementById('game-timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            
+            // Actualizar círculo de progreso
+            const totalTime = state.settings?.roundTime || 300;
+            const progress = (state.localTimer / totalTime) * 100;
+            document.getElementById('timer-progress').setAttribute('stroke-dashoffset', 100 - progress);
+        }
+        
+        function openLocalEliminateModal() {
+            const list = document.getElementById('accuse-players-list');
+            list.innerHTML = '';
+            
+            state.players.filter(p => !state.eliminatedPlayers?.includes(p.id)).forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 flex items-center gap-3 transition-colors';
+                btn.innerHTML = `<span class="text-xl">👤</span><span class="font-medium">${p.name}</span>`;
+                btn.onclick = () => eliminateLocalPlayer(p.id);
+                list.appendChild(btn);
+            });
+            
+            document.getElementById('accuse-modal').classList.remove('hidden');
+        }
+        
+        function eliminateLocalPlayer(playerId) {
+            const player = state.players.find(p => p.id === playerId);
+            const roleData = state.localRoles[playerId];
+            
+            document.getElementById('accuse-modal').classList.add('hidden');
+            
+            if (!state.eliminatedPlayers) state.eliminatedPlayers = [];
+            state.eliminatedPlayers.push(playerId);
+            
+            // Verificar si era el impostor
+            if (roleData.role === 'impostor') {
+                // Los ciudadanos ganan
+                clearInterval(state.localTimerInterval);
+                setTimeout(() => showLocalResult('citizens', player.name), 500);
+            } else {
+                // Era ciudadano, verificar si queda alguien
+                const remaining = state.players.filter(p => !state.eliminatedPlayers.includes(p.id));
+                const impostorAlive = remaining.some(p => state.localRoles[p.id].role === 'impostor');
+                
+                if (!impostorAlive || remaining.length <= 2) {
+                    clearInterval(state.localTimerInterval);
+                    setTimeout(() => showLocalResult('impostor'), 500);
+                } else {
+                    toast(`${player.name} era ciudadano. El juego continúa.`, 'info');
+                    renderTurnOrder();
+                }
+            }
+        }
+        
+        function showLocalResult(winner, eliminatedName = '') {
+            clearInterval(state.localTimerInterval);
+            
+            const word = Object.values(state.localRoles).find(r => r.role === 'citizen')?.word || '???';
+            const impostor = state.players.find(p => state.localRoles[p.id].role === 'impostor');
+            const category = Object.values(state.localRoles).find(r => r.role === 'citizen')?.category || '';
+            
+            document.getElementById('result-word').textContent = word;
+            document.getElementById('result-category').textContent = category;
+            
+            // Mostrar roles revelados
+            const resultsList = document.getElementById('results-list');
+            resultsList.innerHTML = '';
+            
+            // Título del resultado
+            const header = document.querySelector('#screen-results header h1');
+            if (winner === 'citizens') {
+                header.textContent = '¡CIUDADANOS GANAN!';
+                header.className = 'font-bold text-lg text-citizen-400';
+            } else {
+                header.textContent = '¡EL IMPOSTOR GANA!';
+                header.className = 'font-bold text-lg text-impostor-400';
+            }
+            
+            // Listar todos los jugadores con sus roles
+            state.players.forEach(player => {
+                const roleData = state.localRoles[player.id];
+                const isImpostor = roleData.role === 'impostor';
+                const wasEliminated = state.eliminatedPlayers?.includes(player.id);
+                
+                const div = document.createElement('div');
+                div.className = `p-3 rounded-xl flex items-center justify-between ${isImpostor ? 'bg-impostor-500/20 border border-impostor-500/30' : 'bg-citizen-500/20 border border-citizen-500/30'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">${isImpostor ? '🔴' : '🔵'}</span>
+                        <span class="${wasEliminated ? 'line-through text-gray-500' : ''}">${player.name}</span>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded ${isImpostor ? 'bg-impostor-500/30 text-impostor-300' : 'bg-citizen-500/30 text-citizen-300'}">
+                        ${isImpostor ? 'IMPOSTOR' : 'CIUDADANO'}
+                    </span>
+                `;
+                resultsList.appendChild(div);
+            });
+            
+            // Mostrar botón para nueva ronda
+            document.getElementById('btn-new-round').classList.remove('hidden');
+            document.getElementById('btn-new-round').onclick = () => {
+                // Reiniciar para nueva partida local
+                state.eliminatedPlayers = [];
+                state.localReadyToStart = false;
+                navigateTo('lobby');
+            };
+            document.getElementById('waiting-new-round').classList.add('hidden');
+            
+            navigateTo('results');
+        }
 
         function flipCard() {
             if (state.cardFlipped) return;
+            
+            // Si estamos en pantalla de iniciar partida local, no hacer flip
+            if (state.localReadyToStart) {
+                return;
+            }
+            
             state.cardFlipped = true;
             document.getElementById('reveal-card').classList.add('flipped');
             setTimeout(() => {
@@ -972,7 +1181,7 @@
                 const btnText = document.getElementById('btn-ready-text');
                 if (state.gameMode === 'local' && state.isHost && state.localRoles) {
                     if (state.localPlayerIndex >= state.players.length - 1) {
-                        btnText.textContent = '¡Empezar ronda!';
+                        btnText.textContent = 'Ver quién empieza →';
                     } else {
                         btnText.textContent = 'Siguiente jugador →';
                     }
@@ -985,14 +1194,19 @@
         async function markReady() {
             if (state.isReady) return;
             
-            // Modo local: pasar al siguiente jugador
+            // Modo local: manejar flujo
             if (state.gameMode === 'local' && state.isHost && state.localRoles) {
+                // Si es pantalla de inicio, empezar el juego
+                if (state.localReadyToStart) {
+                    startLocalGame();
+                    return;
+                }
+                
                 state.localPlayerIndex++;
-                state.localReadyCount++;
                 
                 if (state.localPlayerIndex >= state.players.length) {
-                    // Todos vieron su carta
-                    startLocalRound();
+                    // Todos vieron su carta, mostrar pantalla de inicio
+                    showLocalStartScreen();
                 } else {
                     // Mostrar carta del siguiente jugador
                     showLocalPlayerCard();
