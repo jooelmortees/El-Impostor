@@ -1166,12 +1166,34 @@
         }
 
         function flipCard() {
-            if (state.cardFlipped) return;
-            
             // Si estamos en pantalla de iniciar partida local, no hacer flip
             if (state.localReadyToStart) {
                 return;
             }
+            
+            // En modo online, permitir voltear en ambos sentidos (mostrar/ocultar)
+            if (state.gameMode === 'online' || !state.localRoles) {
+                state.cardFlipped = !state.cardFlipped;
+                if (state.cardFlipped) {
+                    document.getElementById('reveal-card').classList.add('flipped');
+                } else {
+                    document.getElementById('reveal-card').classList.remove('flipped');
+                }
+                
+                // Mostrar botón solo cuando está revelada
+                setTimeout(() => {
+                    if (state.cardFlipped && !state.isReady) {
+                        document.getElementById('btn-ready').classList.remove('hidden');
+                        document.getElementById('btn-ready-text').textContent = '¡Entendido!';
+                    } else if (!state.cardFlipped) {
+                        document.getElementById('btn-ready').classList.add('hidden');
+                    }
+                }, 500);
+                return;
+            }
+            
+            // En modo local, solo permitir voltear una vez
+            if (state.cardFlipped) return;
             
             state.cardFlipped = true;
             document.getElementById('reveal-card').classList.add('flipped');
