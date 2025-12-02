@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4042344511494204" crossorigin="anonymous"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -471,6 +473,35 @@
 
     </div>
     
+    <!-- Modal de Anuncio -->
+    <div id="ad-modal" class="fixed inset-0 bg-surface-300/98 backdrop-blur-xl z-[200] flex items-center justify-center hidden">
+        <div class="w-full max-w-md mx-4 text-center">
+            <div class="glass-strong rounded-2xl p-6">
+                <div class="text-4xl mb-4">📺</div>
+                <h3 class="text-lg font-bold mb-2">Cargando partida...</h3>
+                <p class="text-sm text-gray-400 mb-4">Patrocinado por nuestros anunciantes</p>
+                
+                <!-- Contenedor del anuncio de AdSense -->
+                <div id="ad-container" class="bg-surface-100 rounded-xl p-4 mb-4 min-h-[250px] flex items-center justify-center">
+                    <ins class="adsbygoogle"
+                         style="display:block; min-width:300px; min-height:250px;"
+                         data-ad-client="ca-pub-4042344511494204"
+                         data-ad-slot="auto"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                </div>
+                
+                <div id="ad-countdown" class="text-gray-400 text-sm mb-4">
+                    <span id="ad-timer">5</span> segundos...
+                </div>
+                
+                <button id="ad-close-btn" onclick="closeAdModal()" class="btn btn-primary w-full py-3 rounded-xl hidden">
+                    Continuar al juego
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <div id="toast-container" class="fixed top-4 left-4 right-4 z-50 space-y-2 pointer-events-none"></div>
     
     <script>
@@ -863,9 +894,68 @@
             if (!res.success) toast(res.error, 'error');
         }
 
+        // ========================================
+        // SISTEMA DE ANUNCIOS
+        // ========================================
+        
+        let pendingGameData = null;
+        let adTimerInterval = null;
+        
+        function showAdModal(gameData) {
+            pendingGameData = gameData;
+            
+            // Mostrar el modal
+            document.getElementById('ad-modal').classList.remove('hidden');
+            document.getElementById('ad-close-btn').classList.add('hidden');
+            document.getElementById('ad-countdown').classList.remove('hidden');
+            
+            // Inicializar el anuncio de AdSense
+            try {
+                (adsbygoogle = window.adsbygoogle || []).push({});
+            } catch (e) {
+                console.log('AdSense no disponible:', e);
+            }
+            
+            // Cuenta regresiva de 5 segundos
+            let countdown = 5;
+            document.getElementById('ad-timer').textContent = countdown;
+            
+            adTimerInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('ad-timer').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(adTimerInterval);
+                    adTimerInterval = null;
+                    document.getElementById('ad-countdown').classList.add('hidden');
+                    document.getElementById('ad-close-btn').classList.remove('hidden');
+                }
+            }, 1000);
+        }
+        
+        function closeAdModal() {
+            document.getElementById('ad-modal').classList.add('hidden');
+            
+            if (adTimerInterval) {
+                clearInterval(adTimerInterval);
+                adTimerInterval = null;
+            }
+            
+            // Continuar con el flujo del juego
+            if (pendingGameData) {
+                processGameStart(pendingGameData);
+                pendingGameData = null;
+            }
+        }
+        
         function handleGameStart(data) {
             console.log('handleGameStart called', data, 'myPlayerId:', state.playerId);
             
+            // Mostrar anuncio antes de continuar
+            showAdModal(data);
+        }
+        
+        function processGameStart(data) {
             // Guardar configuración de chat
             state.chatEnabled = data.chatEnabled !== false;
             state.turnOrder = [...state.players];
