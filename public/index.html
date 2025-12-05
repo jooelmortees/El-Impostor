@@ -1445,25 +1445,38 @@
             // Verificar si soy el acusado o estoy eliminado
             const isAccused = data.accusedId === state.playerId;
             const isEliminated = state.eliminatedPlayers.includes(state.playerId);
-            const cannotVote = isAccused || isEliminated;
             
-            document.getElementById('voting-buttons').classList.toggle('hidden', cannotVote);
+            // Resetear todos los elementos del modal a su estado inicial
+            document.getElementById('voting-buttons').classList.add('hidden');
             document.getElementById('voting-waiting').classList.add('hidden');
-            document.getElementById('voting-accused-view').classList.toggle('hidden', !isAccused);
-            document.getElementById('voting-progress').classList.toggle('hidden', isAccused);
+            document.getElementById('voting-accused-view').classList.add('hidden');
+            document.getElementById('voting-progress').classList.remove('hidden');
             
-            if (cannotVote) {
-                state.hasVoted = true; // El acusado y los eliminados no pueden votar
-            }
+            // Restaurar contenido original del voting-accused-view
+            document.getElementById('voting-accused-view').innerHTML = `
+                <div class="text-5xl mb-4">😰</div>
+                <p class="text-lg font-bold text-impostor-400 mb-2">¡Te están acusando!</p>
+                <p class="text-sm text-gray-400">Espera mientras los demás votan...</p>
+            `;
             
-            // Si estoy eliminado, mostrar mensaje especial
-            if (isEliminated && !isAccused) {
+            if (isAccused) {
+                // Soy el acusado: mostrar vista especial, ocultar botones y progreso
+                state.hasVoted = true;
+                document.getElementById('voting-accused-view').classList.remove('hidden');
+                document.getElementById('voting-progress').classList.add('hidden');
+            } else if (isEliminated) {
+                // Estoy eliminado: mostrar mensaje especial, no puedo votar
+                state.hasVoted = true;
                 document.getElementById('voting-accused-view').classList.remove('hidden');
                 document.getElementById('voting-accused-view').innerHTML = `
                     <div class="text-5xl mb-4">👻</div>
                     <p class="text-lg font-bold text-gray-400 mb-2">Estás eliminado</p>
                     <p class="text-sm text-gray-500">No puedes participar en la votación</p>
                 `;
+            } else {
+                // Jugador normal: mostrar botones de votación
+                state.hasVoted = false;
+                document.getElementById('voting-buttons').classList.remove('hidden');
             }
             
             document.getElementById('voting-modal').classList.remove('hidden');
